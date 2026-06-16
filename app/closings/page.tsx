@@ -1,0 +1,1466 @@
+"use client"
+
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query"
+import { format } from "date-fns"
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  HelpCircle,
+  Loader2,
+  LogOut,
+  MapPin,
+  MapPinOff,
+  MessageCircle,
+  Package,
+  Phone,
+  PhoneCall,
+  RefreshCw,
+  Search,
+  User,
+} from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { FilterControls } from "@/components/dashboard/filter-controls"
+import { DeliveryTable } from "@/components/dashboard/delivery-table"
+import { formatPreDeliveryCreatedAtFrench } from "@/lib/utils"
+
+type PreDeliveryStatus =
+  | "no_response"
+  | "confirmed"
+  | "not_interested"
+  | "does_not_remember"
+  | "beyond_delivery_zone"
+  | "will_call_us_when_ready"
+
+interface CloserCustomer {
+  name: string
+  customer_id: string
+}
+
+interface CloserProfile {
+  _id: string
+  user_id: string
+  access_code: string
+  first_name: string
+  last_name: string
+  role: string
+  email: string
+  phone_number: string
+  customers: CloserCustomer[]
+}
+
+interface PreDelivery {
+  pre_delivery_id: string
+  created_at?: string
+  /** Some API responses use camelCase */
+  createdAt?: string
+  recipient_address_line: string
+  recipient_name: string
+  recipient_phone_number: string
+  package_description: string
+  package_value_currency: string
+  package_value_amount: number
+  is_delivery_price_included: boolean
+  customer_id: string
+  status?: string
+}
+
+interface Commune {
+  commune_id: string
+  name: string
+  quartiers: Quartier[]
+}
+
+interface Quartier {
+  id: number
+  name: string
+}
+
+const SESSION_KEY = "daredare_closer_session"
+
+const STATUS_CONFIG: Record<
+  PreDeliveryStatus | "pending",
+  { label: string; icon: React.ElementType; color: string; bg: string; ring: string; rowBg: string }
+> = {
+  pending: {
+    label: "En attente",
+    icon: Clock,
+    color: "text-amber-700",
+    bg: "bg-amber-50",
+    ring: "ring-amber-200",
+    rowBg: "bg-amber-50/40",
+  },
+  no_response: {
+    label: "Pas de réponse",
+    icon: Phone,
+    color: "text-gray-600",
+    bg: "bg-gray-100",
+    ring: "ring-gray-300",
+    rowBg: "",
+  },
+  confirmed: {
+    label: "Confirmé",
+    icon: CheckCircle2,
+    color: "text-green-700",
+    bg: "bg-green-50",
+    ring: "ring-green-300",
+    rowBg: "bg-green-50/40",
+  },
+  not_interested: {
+    label: "Pas intéressé",
+    icon: AlertCircle,
+    color: "text-red-700",
+    bg: "bg-red-50",
+    ring: "ring-red-300",
+    rowBg: "bg-red-50/30",
+  },
+  does_not_remember: {
+    label: "Ne se souvient pas",
+    icon: HelpCircle,
+    color: "text-orange-700",
+    bg: "bg-orange-50",
+    ring: "ring-orange-300",
+    rowBg: "bg-orange-50/30",
+  },
+  beyond_delivery_zone: {
+    label: "Hors zone",
+    icon: MapPinOff,
+    color: "text-purple-700",
+    bg: "bg-purple-50",
+    ring: "ring-purple-300",
+    rowBg: "bg-purple-50/30",
+  },
+  will_call_us_when_ready: {
+    label: "Rappellera",
+    icon: PhoneCall,
+    color: "text-blue-700",
+    bg: "bg-blue-50",
+    ring: "ring-blue-300",
+    rowBg: "bg-blue-50/30",
+  },
+}
+
+function getStatusKey(status?: string | null): PreDeliveryStatus | "pending" {
+  if (!status || status === "null" || status === "undefined") return "pending"
+  const normalized = status.trim().toLowerCase()
+  if (normalized in STATUS_CONFIG) return normalized as PreDeliveryStatus
+  const mapped: Record<string, PreDeliveryStatus> = {
+    beyonddeliveryzone: "beyond_delivery_zone",
+    willcalluswhenready: "will_call_us_when_ready",
+    noresponse: "no_response",
+    notinterested: "not_interested",
+    doesnotremember: "does_not_remember",
+    confirmed: "confirmed",
+  }
+  return mapped[normalized.replace(/[\s_-]/g, "")] || "pending"
+}
+
+function StatusBadge({ status }: { status?: string }) {
+  const key = getStatusKey(status)
+  const cfg = STATUS_CONFIG[key]
+  const Icon = cfg.icon
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${cfg.bg} ${cfg.color} ${cfg.ring}`}
+    >
+      <Icon className="h-3 w-3" />
+      {cfg.label}
+    </span>
+  )
+}
+
+const getPhoneHref = (phoneNumber: string) => {
+  const normalizedPhoneNumber = phoneNumber?.replace(/[^\d+]/g, "") || ""
+  return normalizedPhoneNumber ? `tel:${normalizedPhoneNumber}` : ""
+}
+
+const getWhatsappHref = (phoneNumber: string) => {
+  const normalizedPhoneNumber = phoneNumber?.replace(/\D/g, "").replace(/^00/, "") || ""
+  return normalizedPhoneNumber ? `https://wa.me/${normalizedPhoneNumber}` : ""
+}
+
+function ClosingsContent() {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_SERVER_BASE_URL
+  const { toast } = useToast()
+
+  const [accessCode, setAccessCode] = useState("")
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [profile, setProfile] = useState<CloserProfile | null>(null)
+  const [selectedCustomerId, setSelectedCustomerId] = useState("")
+  const [activeTab, setActiveTab] = useState("pre-deliveries")
+
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [updatingRowId, setUpdatingRowId] = useState<string | null>(null)
+  const [editingField, setEditingField] = useState<{id: string, field: 'address' | 'value'} | null>(null)
+  const [mobileDelivererZones, setMobileDelivererZones] = useState<any[]>([])
+  const [selectedZoneId, setSelectedZoneId] = useState("")
+  const [selectedPreDeliveryForZone, setSelectedPreDeliveryForZone] = useState<PreDelivery | null>(null)
+  const [preferredDeliveryDate, setPreferredDeliveryDate] = useState("")
+  const [selectedPreDelivery, setSelectedPreDelivery] = useState<PreDelivery | null>(null)
+  const [showDialog, setShowDialog] = useState(false)
+  const [selectedStatus, setSelectedStatus] = useState("")
+  const [selectedCommuneId, setSelectedCommuneId] = useState("")
+  const [selectedQuartierId, setSelectedQuartierId] = useState("")
+  const [isSubmittingPreDelivery, setIsSubmittingPreDelivery] = useState(false)
+  const [isAssigningZone, setIsAssigningZone] = useState(false)
+
+  const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(undefined)
+  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<string>("tous")
+  const [deliverySearchQuery, setDeliverySearchQuery] = useState<string>("")
+  const [deliveryPage, setDeliveryPage] = useState(1)
+  const [deliveryPageSize] = useState(60)
+
+  const [communes, setCommunes] = useState<Commune[]>([])
+  const [availableQuartiers, setAvailableQuartiers] = useState<Quartier[]>([])
+  const [isUpdatingDelivery, setIsUpdatingDelivery] = useState(false)
+  const [isRefreshingDeliveries, setIsRefreshingDeliveries] = useState(false)
+  const [expandedPreDeliveryId, setExpandedPreDeliveryId] = useState<string | null>(null)
+  const [editPackageValue, setEditPackageValue] = useState("")
+  const [editAddress, setEditAddress] = useState("")
+  const [editNote, setEditNote] = useState("")
+  const [isEditingPreDelivery, setIsEditingPreDelivery] = useState(false)
+
+  useEffect(() => {
+    const stored = localStorage.getItem(SESSION_KEY)
+    if (!stored) return
+    try {
+      const parsed = JSON.parse(stored) as CloserProfile
+      setProfile(parsed)
+      if (parsed.customers?.length > 0) {
+        setSelectedCustomerId(parsed.customers[0].customer_id)
+      }
+    } catch {
+      localStorage.removeItem(SESSION_KEY)
+    }
+  }, [])
+
+  useEffect(() => {
+    const fetchCommunes = async () => {
+      if (!apiBaseUrl) return
+      try {
+        const response = await fetch(`${apiBaseUrl}/deliveries/communes`)
+        if (!response.ok) return
+        const result = await response.json()
+        setCommunes(result.data || [])
+      } catch {
+        setCommunes([])
+      }
+    }
+    fetchCommunes()
+  }, [apiBaseUrl])
+
+  useEffect(() => {
+    if (!selectedCommuneId) {
+      setAvailableQuartiers([])
+      setSelectedQuartierId("")
+      return
+    }
+    const commune = communes.find((item) => item.commune_id === selectedCommuneId)
+    setAvailableQuartiers(commune?.quartiers || [])
+  }, [selectedCommuneId, communes])
+
+  const preDeliveriesQuery = useQuery({
+    queryKey: ["closings-pre-deliveries", selectedCustomerId],
+    queryFn: async () => {
+      const response = await fetch(`${apiBaseUrl}/deliveries/pre-deliveries/closer?customer_id=${selectedCustomerId}`)
+      if (!response.ok) throw new Error("Erreur lors du chargement des pré-livraisons")
+      const result = await response.json()
+      return (result.data || []) as PreDelivery[]
+    },
+    enabled: !!apiBaseUrl && !!selectedCustomerId && !!profile,
+  })
+
+  const deliveriesQuery = useQuery({
+    queryKey: ["closings-deliveries", selectedCustomerId],
+    queryFn: async () => {
+      const response = await fetch(`${apiBaseUrl}/deliveries/user-deliveries?customer_id=${selectedCustomerId}`)
+      if (!response.ok) throw new Error("Erreur lors du chargement des livraisons")
+      const result = await response.json()
+      return result.data || []
+    },
+    enabled: !!apiBaseUrl && !!selectedCustomerId && !!profile,
+  })
+
+  useEffect(() => {
+    if (!profile || !selectedCustomerId) return
+    if (activeTab === "pre-deliveries") {
+      preDeliveriesQuery.refetch()
+      return
+    }
+    deliveriesQuery.refetch()
+  }, [activeTab, profile, selectedCustomerId, preDeliveriesQuery.refetch, deliveriesQuery.refetch])
+
+  const selectedCustomerName = useMemo(() => {
+    return profile?.customers.find((c) => c.customer_id === selectedCustomerId)?.name || ""
+  }, [profile?.customers, selectedCustomerId])
+
+  const handleLogin = async () => {
+    if (!accessCode.trim()) {
+      toast({ title: "Code requis", description: "Veuillez saisir un code d'accès", variant: "destructive" })
+      return
+    }
+    if (!apiBaseUrl) return
+    setIsLoggingIn(true)
+    try {
+      const response = await fetch(`${apiBaseUrl}/users/access-code/${accessCode.trim()}`)
+      const result = await response.json()
+      if (!response.ok || !result.success || !result.data) {
+        throw new Error(result.message || "Code d'accès invalide")
+      }
+      const nextProfile = result.data as CloserProfile
+      setProfile(nextProfile)
+      localStorage.setItem(SESSION_KEY, JSON.stringify(nextProfile))
+      const firstCustomer = nextProfile.customers?.[0]?.customer_id || ""
+      setSelectedCustomerId(firstCustomer)
+      toast({ title: "Connexion réussie", description: `Bienvenue ${nextProfile.first_name}` })
+    } catch (error) {
+      toast({
+        title: "Connexion échouée",
+        description: error instanceof Error ? error.message : "Impossible de valider ce code",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoggingIn(false)
+    }
+  }
+
+  const logout = () => {
+    setProfile(null)
+    setSelectedCustomerId("")
+    setAccessCode("")
+    localStorage.removeItem(SESSION_KEY)
+  }
+
+  // Fetch mobile deliverer zones
+  useEffect(() => {
+    const fetchMobileDelivererZones = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/deliverers/mobile-deliverer-zones`)
+        if (response.ok) {
+          const result = await response.json()
+          setMobileDelivererZones(result.data || [])
+        }
+      } catch (error) {
+        console.error('Failed to fetch mobile deliverer zones:', error)
+      }
+    }
+    
+    if (apiBaseUrl) {
+      fetchMobileDelivererZones()
+    }
+  }, [apiBaseUrl])
+
+  const handleQuickStatusUpdate = useCallback(
+    async (preDelivery: PreDelivery, newStatus: string) => {
+      if (!apiBaseUrl) return
+      if (newStatus === "confirmed") {
+        setSelectedPreDelivery(preDelivery)
+        setSelectedStatus("confirmed")
+        setSelectedCommuneId("")
+        setSelectedQuartierId("")
+        setEditPackageValue(preDelivery.package_value_amount?.toString() || "")
+        setEditAddress(preDelivery.recipient_address_line || "")
+        setEditNote("")
+        setShowDialog(true)
+        return
+      }
+      if (newStatus === "assign_zone") {
+        setSelectedPreDeliveryForZone(preDelivery)
+        setSelectedZoneId("")
+        setPreferredDeliveryDate("")
+        setEditAddress(preDelivery.recipient_address_line || "")
+        setEditPackageValue(preDelivery.package_value_amount?.toString() || "")
+        setEditNote("")
+        return
+      }
+
+      setUpdatingRowId(preDelivery.pre_delivery_id)
+      try {
+        const response = await fetch(`${apiBaseUrl}/deliveries/update-pre-delivery-status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pre_delivery_id: preDelivery.pre_delivery_id, status: newStatus }),
+        })
+        if (!response.ok) throw new Error("Impossible de mettre à jour le statut")
+        toast({ title: "Statut mis à jour" })
+        preDeliveriesQuery.refetch()
+      } catch (error) {
+        toast({
+          title: "Erreur",
+          description: error instanceof Error ? error.message : "Mise à jour échouée",
+          variant: "destructive",
+        })
+      } finally {
+        setUpdatingRowId(null)
+      }
+    },
+    [apiBaseUrl, preDeliveriesQuery, toast],
+  )
+
+  const handleSubmitPreDelivery = async () => {
+    if (!apiBaseUrl || !selectedPreDelivery) return
+    if (!selectedStatus) {
+      toast({ title: "Statut requis", variant: "destructive" })
+      return
+    }
+    if (selectedStatus === "confirmed" && (!selectedCommuneId || !selectedQuartierId)) {
+      toast({
+        title: "Informations manquantes",
+        description: "Commune et quartier sont requis pour confirmer",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSubmittingPreDelivery(true)
+    try {
+      // First update editable fields if they changed
+      const patchPayload: any = {
+        pre_delivery_id: selectedPreDelivery.pre_delivery_id,
+      }
+      
+      if (editPackageValue.trim() && editPackageValue !== selectedPreDelivery.package_value_amount?.toString()) {
+        patchPayload.package_value_amount = editPackageValue.trim()
+      }
+      
+      if (editAddress.trim() && editAddress !== selectedPreDelivery.recipient_address_line) {
+        patchPayload.recipient_address_line = editAddress.trim()
+      }
+      
+      // Only call PATCH if there are changes to editable fields
+      if (patchPayload.package_value_amount || patchPayload.recipient_address_line) {
+        const patchResponse = await fetch(`${apiBaseUrl}/deliveries/pre-deliveries`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patchPayload),
+        })
+        if (!patchResponse.ok) {
+          const errorData = await patchResponse.json().catch(() => ({}))
+          throw new Error(errorData.message || "Erreur lors de la mise à jour des données")
+        }
+      }
+      
+      // Then update status if needed
+      const statusPayload: Record<string, string> = {
+        pre_delivery_id: selectedPreDelivery.pre_delivery_id,
+        status: selectedStatus,
+      }
+      if (selectedStatus === "confirmed") {
+        statusPayload.commune_id = selectedCommuneId
+        statusPayload.quartier_id = selectedQuartierId
+      }
+      if (editNote.trim()) {
+        statusPayload.note = editNote.trim()
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/deliveries/update-pre-delivery-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(statusPayload),
+      })
+      if (!response.ok) throw new Error("Impossible de mettre à jour cette pré-livraison")
+      toast({ title: "Pré-livraison mise à jour" })
+      setShowDialog(false)
+      setSelectedPreDelivery(null)
+      preDeliveriesQuery.refetch()
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Mise à jour échouée",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmittingPreDelivery(false)
+    }
+  }
+
+  const handleAssignZone = async () => {
+    console.log("Assigning zone with data:", {
+      pre_delivery_id: selectedPreDeliveryForZone?.pre_delivery_id,
+      mobile_deliverer_zone_id: selectedZoneId,
+      preferred_delivery_date: preferredDeliveryDate,
+
+    })
+    if (!apiBaseUrl || !selectedPreDeliveryForZone || !selectedZoneId) return
+    if (!preferredDeliveryDate) {
+      toast({
+        title: "Date requise",
+        description: "Veuillez choisir une date de livraison preferee",
+        variant: "destructive",
+      })
+      return
+    }
+    console.log("Preferred delivery date string:", preferredDeliveryDate)
+    const preferredDeliveryDateEpoch = new Date(`${preferredDeliveryDate}`).getTime()
+    if (Number.isNaN(preferredDeliveryDateEpoch)) {
+      console.error("Invalid preferred delivery date:", preferredDeliveryDateEpoch)
+      toast({
+        title: "Date invalide",
+        description: "Veuillez choisir une date de livraison valide",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    setIsAssigningZone(true)
+    try {
+      // First update editable fields if they changed
+      const patchPayload: any = {
+        pre_delivery_id: selectedPreDeliveryForZone.pre_delivery_id,
+      }
+
+      if (editAddress.trim() && editAddress !== selectedPreDeliveryForZone.recipient_address_line) {
+        patchPayload.recipient_address_line = editAddress.trim()
+      }
+
+      if (editPackageValue.trim() && editPackageValue !== selectedPreDeliveryForZone.package_value_amount?.toString()) {
+        patchPayload.package_value_amount = editPackageValue.trim()
+      }
+
+      if (patchPayload.recipient_address_line || patchPayload.package_value_amount) {
+        const patchResponse = await fetch(`${apiBaseUrl}/deliveries/pre-deliveries`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patchPayload),
+        })
+        if (!patchResponse.ok) {
+          const errorData = await patchResponse.json().catch(() => ({}))
+          throw new Error(errorData.message || "Erreur lors de la mise à jour de l'adresse")
+        }
+      }
+      console.log("Sending assign zone request with epoch date:", preferredDeliveryDateEpoch)
+      const response = await fetch(`${apiBaseUrl}/deliveries/pre-deliveries/assign-zone`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pre_delivery_id: selectedPreDeliveryForZone.pre_delivery_id,
+          mobile_deliverer_zone_id: selectedZoneId,
+          preferred_delivery_date: preferredDeliveryDateEpoch,
+        }),
+      })
+      
+      if (response.ok) {
+        toast({ title: "Zone assignée avec succès" })
+        setSelectedPreDeliveryForZone(null)
+        setSelectedZoneId("")
+        setPreferredDeliveryDate("")
+        setEditAddress("")
+        setEditPackageValue("")
+        setEditNote("")
+        preDeliveriesQuery.refetch()
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Erreur lors de l'assignation de zone")
+      }
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Échec de l'assignation",
+        variant: "destructive",
+      })
+    } finally {
+      setIsAssigningZone(false)
+    }
+  }
+
+  const handleQuickAssignZone = async (preDelivery: PreDelivery) => {
+    if (!apiBaseUrl) return
+    
+    setSelectedPreDeliveryForZone(preDelivery)
+    setSelectedZoneId("")
+    setPreferredDeliveryDate("")
+    setEditAddress(preDelivery.recipient_address_line || "")
+    setEditPackageValue(preDelivery.package_value_amount?.toString() || "")
+    setEditNote("")
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const handleCloseAssignZoneView = () => {
+    setSelectedPreDeliveryForZone(null)
+    setSelectedZoneId("")
+    setPreferredDeliveryDate("")
+    setEditAddress("")
+    setEditPackageValue("")
+    setEditNote("")
+  }
+
+  const handleRefreshDeliveries = async () => {
+    setIsRefreshingDeliveries(true)
+    await deliveriesQuery.refetch()
+    setIsRefreshingDeliveries(false)
+  }
+
+  const handleUpdateDelivery = async (updateData: any) => {
+    if (!apiBaseUrl) return
+    setIsUpdatingDelivery(true)
+    try {
+      const response = await fetch(`${apiBaseUrl}/deliveries`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      })
+      if (!response.ok) throw new Error("Échec de mise à jour")
+      toast({ title: "Livraison mise à jour" })
+      deliveriesQuery.refetch()
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de mettre à jour la livraison", variant: "destructive" })
+    } finally {
+      setIsUpdatingDelivery(false)
+    }
+  }
+
+  const handleCancelDelivery = async (cancelData: any) => {
+    if (!apiBaseUrl) return
+    setIsUpdatingDelivery(true)
+    try {
+      const response = await fetch(`${apiBaseUrl}/deliveries/cancel-delivery`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cancelData),
+      })
+      if (!response.ok) throw new Error("Échec d'annulation")
+      toast({ title: "Livraison annulée" })
+      deliveriesQuery.refetch()
+    } catch {
+      toast({ title: "Erreur", description: "Impossible d'annuler la livraison", variant: "destructive" })
+    } finally {
+      setIsUpdatingDelivery(false)
+    }
+  }
+
+  const filteredPreDeliveries = useMemo(() => {
+    const list = (preDeliveriesQuery.data || []) as PreDelivery[]
+    return list.filter((pd) => {
+      if (statusFilter !== "all") {
+        if (statusFilter === "pending" && pd.status) return false
+        if (statusFilter !== "pending" && pd.status !== statusFilter) return false
+      }
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase()
+        const createdSource = pd.created_at ?? pd.createdAt
+        const text = [
+          pd.recipient_name,
+          pd.recipient_phone_number,
+          pd.recipient_address_line,
+          pd.package_description,
+          selectedCustomerName,
+          createdSource ?? "",
+          formatPreDeliveryCreatedAtFrench(pd),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+        if (!text.includes(query)) return false
+      }
+      return true
+    })
+  }, [preDeliveriesQuery.data, searchQuery, selectedCustomerName, statusFilter])
+
+  const paginatedPreDeliveries = useMemo(() => {
+    const startIndex = (deliveryPage - 1) * deliveryPageSize
+    const endIndex = startIndex + deliveryPageSize
+    return filteredPreDeliveries.slice(startIndex, endIndex)
+  }, [filteredPreDeliveries, deliveryPage, deliveryPageSize])
+
+  const totalPages = Math.ceil(filteredPreDeliveries.length / deliveryPageSize)
+
+  const filteredDeliveries = useMemo(() => {
+    const rows = deliveriesQuery.data || []
+    return rows.filter((delivery: any) => {
+      if (deliveryStatusFilter !== "tous" && delivery.status !== deliveryStatusFilter) return false
+
+      if (deliveryDate) {
+        const createdAt = delivery.created_at ? new Date(delivery.created_at) : null
+        if (!createdAt) return false
+        const selected = format(deliveryDate, "yyyy-MM-dd")
+        const value = format(createdAt, "yyyy-MM-dd")
+        if (selected !== value) return false
+      }
+
+      if (deliverySearchQuery.trim()) {
+        const query = deliverySearchQuery.toLowerCase()
+        const text = [
+          delivery.package_code,
+          delivery.delivery_id,
+          delivery.pickup_address?.address_line,
+          delivery.recipient?.address?.address_line,
+          delivery.recipient?.name,
+          delivery.package?.title,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+        if (!text.includes(query)) return false
+      }
+      return true
+    })
+  }, [deliveriesQuery.data, deliveryDate, deliverySearchQuery, deliveryStatusFilter])
+
+  if (!profile) {
+    return (
+      <div className="mx-auto w-full max-w-md px-3 py-10 sm:px-4 sm:py-14">
+        <Card className="shadow-sm border-border/80">
+          <CardHeader>
+            <CardTitle>Accès closings</CardTitle>
+            <CardDescription>Saisissez votre code d'accès pour consulter les clients assignés.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="accessCode">Code d'accès</Label>
+              <Input
+                id="accessCode"
+                placeholder="Ex: 689556"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleLogin()
+                }}
+              />
+            </div>
+            <Button onClick={handleLogin} disabled={isLoggingIn} className="w-full bg-[#2B015F] hover:bg-[#1A0138]">
+              {isLoggingIn ? "Connexion..." : "Se connecter"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-7xl min-h-[calc(100dvh-3.5rem)] overflow-x-hidden px-3 pb-28 pt-4 sm:px-4 sm:pb-10 lg:px-8 lg:py-8 lg:pb-12 space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-[#2B015F] sm:text-2xl">Closings</h1>
+          <p className="text-xs text-muted-foreground mt-1 sm:text-sm">
+            {profile.first_name} {profile.last_name} ({profile.role})
+          </p>
+        </div>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[280px] sm:flex-row sm:flex-1 sm:justify-end">
+          <Select
+            value={selectedCustomerId}
+            onValueChange={(value) => {
+              setSelectedCustomerId(value)
+              handleCloseAssignZoneView()
+            }}
+          >
+            <SelectTrigger className="w-full sm:max-w-[320px]" aria-label="Client">
+              <SelectValue placeholder="Sélectionner un client" />
+            </SelectTrigger>
+            <SelectContent>
+              {profile?.customers?.map((customer) => (
+                <SelectItem key={customer.customer_id} value={customer.customer_id}>
+                  {customer.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" className="w-full shrink-0 sm:w-auto" onClick={logout}>
+            <LogOut className="h-4 w-4 mr-2 shrink-0" />
+            Déconnexion
+          </Button>
+        </div>
+      </div>
+
+      {selectedPreDeliveryForZone && (
+        <Card className="overflow-hidden border-[#2B015F]/20 bg-[#2B015F]/[0.03] shadow-sm">
+          <CardHeader className="space-y-3 px-3 pb-3 pt-4 sm:px-6 sm:pt-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <CardTitle className="text-lg text-[#2B015F]">Assigner une zone</CardTitle>
+                <CardDescription>
+                  Choisissez la zone et la date de livraison preferee.
+                </CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleCloseAssignZoneView} className="w-full sm:w-auto">
+                Annuler
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 px-3 pb-4 sm:px-6">
+            <div className="rounded-xl border bg-background p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-2">
+                  <p className="text-base font-semibold leading-tight">
+                    {selectedPreDeliveryForZone.recipient_name || "Non specifie"}
+                  </p>
+                  <a
+                    href={getPhoneHref(selectedPreDeliveryForZone.recipient_phone_number) || undefined}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-[#2563eb]"
+                  >
+                    <Phone className="h-4 w-4 shrink-0" aria-hidden />
+                    <span>{selectedPreDeliveryForZone.recipient_phone_number}</span>
+                  </a>
+                </div>
+                <StatusBadge status={selectedPreDeliveryForZone.status} />
+              </div>
+              <div className="mt-3 flex gap-2 text-muted-foreground">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                <p className="text-xs leading-snug break-words">{selectedPreDeliveryForZone.recipient_address_line}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="zone-select">Zone de livraison</Label>
+                <Select value={selectedZoneId} onValueChange={setSelectedZoneId}>
+                  <SelectTrigger id="zone-select" className="h-11">
+                    <SelectValue placeholder="Selectionner une zone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mobileDelivererZones.map((zone: any) => (
+                      <SelectItem key={zone.mobile_deliverer_zone_id} value={zone.mobile_deliverer_zone_id}>
+                        {zone.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="preferred-delivery-date">Date de livraison preferee</Label>
+                <Input
+                  id="preferred-delivery-date"
+                  //we need date and time
+                  type="datetime-local"
+                  value={preferredDeliveryDate}
+                  onChange={(e) => setPreferredDeliveryDate(e.target.value)}
+                  className="h-11"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="assign-zone-address">Adresse de livraison</Label>
+              <Input
+                id="assign-zone-address"
+                value={editAddress}
+                onChange={(e) => setEditAddress(e.target.value)}
+                placeholder="Adresse complete du destinataire"
+                className="h-11"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="assign-zone-package-value">
+                Valeur du colis ({selectedPreDeliveryForZone.package_value_currency || "USD"})
+              </Label>
+              <Input
+                id="assign-zone-package-value"
+                value={editPackageValue}
+                onChange={(e) => setEditPackageValue(e.target.value)}
+                placeholder="Prix du colis"
+                className="h-11"
+              />
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={handleCloseAssignZoneView} className="w-full sm:w-auto">
+                Annuler
+              </Button>
+              <Button
+                onClick={handleAssignZone}
+                disabled={!selectedZoneId || !preferredDeliveryDate || isAssigningZone}
+                className="w-full bg-[#2B015F] hover:bg-[#1A0138] sm:w-auto"
+              >
+                {isAssigningZone ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Assignation...
+                  </>
+                ) : (
+                  "Assigner la zone"
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-3 sm:space-y-4">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 sm:max-w-md">
+          <TabsTrigger value="pre-deliveries" className="text-xs py-2.5 sm:text-sm shrink-0">
+            Pré-livraisons
+          </TabsTrigger>
+          <TabsTrigger value="deliveries" className="text-xs py-2.5 sm:text-sm shrink-0">
+            Livraisons
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pre-deliveries" className="mt-4 space-y-4 sm:mt-6">
+          <Card className="overflow-hidden border-border/80 shadow-sm">
+            <CardHeader className="space-y-3 pb-4 px-3 sm:px-6 pt-4 sm:pt-6">
+              <div className="flex flex-col gap-3">
+                <div className="relative w-full flex-1 min-w-0">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-11"
+                    placeholder="Rechercher (nom, tél., adresse...)"
+                  />
+                </div>
+                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-stretch">
+                <div className="relative w-full sm:flex-1 sm:max-w-[14rem]">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Filtrer par statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les statuts</SelectItem>
+                      <SelectItem value="pending">En attente</SelectItem>
+                      <SelectItem value="confirmed">Confirmé</SelectItem>
+                      <SelectItem value="no_response">Pas de réponse</SelectItem>
+                      <SelectItem value="not_interested">Pas intéressé</SelectItem>
+                      <SelectItem value="does_not_remember">Ne se souvient pas</SelectItem>
+                      <SelectItem value="beyond_delivery_zone">Hors zone</SelectItem>
+                      <SelectItem value="will_call_us_when_ready">Rappellera</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="outline"
+                  className="h-11 w-full shrink-0 gap-2 sm:w-auto sm:min-w-[7.5rem]"
+                  onClick={() => preDeliveriesQuery.refetch()}
+                  disabled={preDeliveriesQuery.isFetching}
+                  type="button"
+                >
+                  <RefreshCw className={`h-4 w-4 shrink-0 ${preDeliveriesQuery.isFetching ? "animate-spin" : ""}`} />
+                  Actualiser
+                </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {preDeliveriesQuery.isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2B015F]" />
+                </div>
+              ) : filteredPreDeliveries.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
+                  <Package className="h-10 w-10 text-muted-foreground/35" aria-hidden />
+                  <p className="text-sm font-medium text-muted-foreground">Aucune pré-livraison trouvée</p>
+                  <p className="max-w-[280px] text-xs text-muted-foreground">Affinez la recherche ou le filtre statut.</p>
+                </div>
+              ) : (
+                <>
+                <div className="hidden lg:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Client</TableHead>
+                        <TableHead className="min-w-[180px] max-w-[220px]">Créée le</TableHead>
+                        <TableHead>Destinataire</TableHead>
+                        <TableHead>Téléphone</TableHead>
+                        <TableHead className="min-w-[14rem]">Adresse</TableHead>
+                        <TableHead className="text-right">Valeur</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead className="w-10 p-2" aria-label="Déplier les actions" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedPreDeliveries.map((pd) => {
+                        const isExpanded = expandedPreDeliveryId === pd.pre_delivery_id
+                        return (
+                          <Fragment key={pd.pre_delivery_id}>
+                            <TableRow
+                              className={`${STATUS_CONFIG[getStatusKey(pd.status || "pending")].rowBg} ${updatingRowId === pd.pre_delivery_id ? "opacity-60" : ""}`}
+                            >
+                              <TableCell>{selectedCustomerName || "—"}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground capitalize leading-snug max-w-[220px] whitespace-normal">
+                                {formatPreDeliveryCreatedAtFrench(pd)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="space-y-0.5">
+                                  <p className="text-sm font-medium">{pd.recipient_name || "Non spécifié"}</p>
+                                  <p className="text-xs text-gray-400">{pd.package_description}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>{pd.recipient_phone_number}</TableCell>
+                              <TableCell className="min-w-[14rem] max-w-2xl align-top whitespace-normal break-words py-3 text-sm leading-relaxed">
+                                {pd.recipient_address_line}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {pd.package_value_amount} {pd.package_value_currency}
+                              </TableCell>
+                              <TableCell>
+                                <StatusBadge status={pd.status} />
+                              </TableCell>
+                              <TableCell className="py-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  type="button"
+                                  className="h-8 w-8 shrink-0"
+                                  aria-expanded={isExpanded}
+                                  aria-label={isExpanded ? "Masquer les actions" : "Afficher les actions rapides"}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setExpandedPreDeliveryId((cur) =>
+                                      cur === pd.pre_delivery_id ? null : pd.pre_delivery_id,
+                                    )
+                                  }}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 text-gray-600" />
+                                  )}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {isExpanded && (
+                              <TableRow className={STATUS_CONFIG[getStatusKey(pd.status)].rowBg}>
+                                <TableCell colSpan={8} className="border-t bg-gray-50/80 py-4">
+                                  <div className="flex flex-wrap items-center gap-3 px-2">
+                                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                      Action rapide
+                                    </span>
+                                    <Select
+                                      key={`${pd.pre_delivery_id}-${pd.status}-expanded`}
+                                      onValueChange={(value) => handleQuickStatusUpdate(pd, value)}
+                                      disabled={updatingRowId === pd.pre_delivery_id}
+                                    >
+                                      <SelectTrigger className="h-9 w-full max-w-sm text-xs">
+                                        <SelectValue placeholder="Changer le statut" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="confirmed">Confirmé</SelectItem>
+                                        <SelectItem value="no_response">Pas de réponse</SelectItem>
+                                        <SelectItem value="not_interested">Pas intéressé</SelectItem>
+                                        <SelectItem value="does_not_remember">Ne se souvient pas</SelectItem>
+                                        <SelectItem value="beyond_delivery_zone">Hors zone</SelectItem>
+                                        <SelectItem value="will_call_us_when_ready">Rappellera</SelectItem>
+                                        <SelectItem value="assign_zone">Confirmer zone</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-between px-4 py-3 border-t bg-background/95">
+                  <div className="text-sm text-muted-foreground">
+                    Page {deliveryPage} sur {totalPages || 1} ({filteredPreDeliveries.length} total)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeliveryPage(Math.max(1, deliveryPage - 1))}
+                      disabled={deliveryPage <= 1 || preDeliveriesQuery.isFetching}
+                    >
+                      Précédent
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeliveryPage(deliveryPage + 1)}
+                      disabled={preDeliveriesQuery.isFetching || deliveryPage >= totalPages}
+                    >
+                      Suivant
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="lg:hidden space-y-3 px-3 pb-4 pt-2 sm:px-4">
+                  {paginatedPreDeliveries.map((pd) => {
+                    const rowTone = STATUS_CONFIG[getStatusKey(pd.status)].rowBg
+                    const isUpdating = updatingRowId === pd.pre_delivery_id
+                    const isExpandedMobile = expandedPreDeliveryId === pd.pre_delivery_id
+                    const phoneHref = getPhoneHref(pd.recipient_phone_number)
+                    const whatsappHref = getWhatsappHref(pd.recipient_phone_number)
+                    return (
+                      <div
+                        key={pd.pre_delivery_id}
+                        className={`rounded-xl border bg-card shadow-sm overflow-hidden transition-opacity ${rowTone || ""} ${isUpdating ? "opacity-70" : ""}`}
+                      >
+                        <div className="flex items-start justify-between gap-3 p-4 pb-2">
+                          <div className="min-w-0 flex-1 space-y-2">
+                            {selectedCustomerName ? (
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2B015F]/80">
+                                {selectedCustomerName}
+                              </p>
+                            ) : null}
+                            <p className="text-base font-semibold leading-tight">{pd.recipient_name || "Non spécifié"}</p>
+                            <p className="text-xs text-muted-foreground capitalize leading-snug">
+                              {formatPreDeliveryCreatedAtFrench(pd)}
+                            </p>
+                          </div>
+                          <StatusBadge status={pd.status} />
+                        </div>
+                        <div className="space-y-2 px-4 text-sm">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {phoneHref && (
+                              <Button asChild size="sm" className="h-9 flex-1 bg-[#2B015F] hover:bg-[#1A0138] sm:flex-none">
+                                <a href={phoneHref} aria-label={`Appeler ${pd.recipient_phone_number}`}>
+                                  <Phone className="h-4 w-4" />
+                                  Appeler
+                                </a>
+                              </Button>
+                            )}
+                            {whatsappHref && (
+                              <Button asChild size="sm" variant="outline" className="h-9 flex-1 border-green-600 text-green-700 hover:bg-green-50 sm:flex-none">
+                                <a
+                                  href={whatsappHref}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-label={`Contacter ${pd.recipient_phone_number} sur WhatsApp`}
+                                >
+                                  <MessageCircle className="h-4 w-4" />
+                                  WhatsApp
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                          {pd.recipient_phone_number && (
+                            <a
+                              href={phoneHref || undefined}
+                              className="inline-flex items-center gap-2 text-[#2563eb] font-medium underline-offset-2 touch-manipulation"
+                            >
+                              <Phone className="h-4 w-4 shrink-0" aria-hidden />
+                              <span>{pd.recipient_phone_number}</span>
+                            </a>
+                          )}
+                          <div className="flex gap-2 text-muted-foreground">
+                            <MapPin className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+                            <p className="text-xs leading-snug break-words">{pd.recipient_address_line}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{pd.package_description}</p>
+                          <div className="flex flex-wrap items-baseline gap-2 pb-3">
+                            <span className="text-xs uppercase text-muted-foreground">Valeur</span>
+                            <span className="font-semibold tabular-nums">
+                              {pd.package_value_amount} {pd.package_value_currency}
+                              {!pd.is_delivery_price_included ? (
+                                <span className="ml-2 text-[10px] font-normal text-orange-600">(+ frais livr.)</span>
+                              ) : null}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="border-t bg-background/95 px-3 py-3 sm:px-4">
+                          <div className="grid gap-2">
+                            <Select
+                              key={`${pd.pre_delivery_id}-${pd.status}-mobile`}
+                              onValueChange={(value) => handleQuickStatusUpdate(pd, value)}
+                              disabled={isUpdating}
+                            >
+                              <SelectTrigger className="h-11 w-full text-xs">
+                                <SelectValue placeholder="Changer le statut" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-[min(70vh,24rem)]">
+                                <SelectItem value="confirmed">Confirmé</SelectItem>
+                                <SelectItem value="no_response">Pas de réponse</SelectItem>
+                                <SelectItem value="not_interested">Pas intéressé</SelectItem>
+                                <SelectItem value="does_not_remember">Ne se souvient pas</SelectItem>
+                                <SelectItem value="beyond_delivery_zone">Hors zone</SelectItem>
+                                <SelectItem value="will_call_us_when_ready">Rappellera</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleQuickAssignZone(pd)}
+                              disabled={isUpdating}
+                              className="h-11 w-full bg-[#2B015F] text-white hover:bg-[#1A0138]"
+                            >
+                              Confirmer zone
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="h-10 w-full justify-between font-medium"
+                              onClick={() =>
+                                setExpandedPreDeliveryId((cur) =>
+                                  cur === pd.pre_delivery_id ? null : pd.pre_delivery_id,
+                                )
+                              }
+                              aria-expanded={isExpandedMobile}
+                            >
+                              Actions rapides
+                              {isExpandedMobile ? (
+                                <ChevronDown className="h-4 w-4 opacity-70" aria-hidden />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 opacity-70" aria-hidden />
+                              )}
+                            </Button>
+                          </div>
+                          {isExpandedMobile && (
+                            <div className="mt-3 space-y-3">
+                              <div className="space-y-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleQuickStatusUpdate(pd, 'confirmed')}
+                                  disabled={isUpdating}
+                                  className="w-full"
+                                >
+                                  Confirmé
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleQuickStatusUpdate(pd, 'no_response')}
+                                  disabled={isUpdating}
+                                  className="w-full"
+                                >
+                                  Pas de réponse
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleQuickStatusUpdate(pd, 'not_interested')}
+                                  disabled={isUpdating}
+                                  className="w-full"
+                                >
+                                  Pas intéressé
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleQuickStatusUpdate(pd, 'does_not_remember')}
+                                  disabled={isUpdating}
+                                  className="w-full"
+                                >
+                                  Ne se souvient pas
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleQuickStatusUpdate(pd, 'beyond_delivery_zone')}
+                                  disabled={isUpdating}
+                                  className="w-full"
+                                >
+                                  Hors zone
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleQuickStatusUpdate(pd, 'will_call_us_when_ready')}
+                                  disabled={isUpdating}
+                                  className="w-full"
+                                >
+                                  Rappellera
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="deliveries" className="space-y-4 sm:space-y-6">
+          <Card className="overflow-hidden border-border/80 shadow-sm">
+            <CardHeader className="space-y-3 px-3 pb-2 pt-4 sm:px-6 sm:pt-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="text-lg sm:text-xl">Livraisons</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefreshDeliveries}
+                  disabled={isRefreshingDeliveries}
+                  className="flex h-10 w-full shrink-0 items-center justify-center gap-2 bg-transparent sm:h-9 sm:w-auto"
+                  type="button"
+                >
+                  <RefreshCw className={`h-4 w-4 shrink-0 ${isRefreshingDeliveries ? "animate-spin" : ""}`} />
+                  Actualiser
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="overflow-x-hidden px-3 pb-4 sm:px-6 lg:overflow-visible">
+              <FilterControls
+                searchQuery={deliverySearchQuery}
+                setSearchQuery={setDeliverySearchQuery}
+                statusFilter={deliveryStatusFilter}
+                setStatusFilter={setDeliveryStatusFilter}
+                date={deliveryDate}
+                setDate={setDeliveryDate}
+                searchPlaceholder="Rechercher par code, adresse, destinataire..."
+                statusOptions={[
+                  { value: "tous", label: "Tous les statuts" },
+                  { value: "unassigned", label: "En attente" },
+                  { value: "assigned", label: "Assignée" },
+                  { value: "delivery_start_to_pickup", label: "En route ramassage" },
+                  { value: "picked", label: "Ramassée" },
+                  { value: "delivery_start_to_recipient", label: "En route livraison" },
+                  { value: "arrived_to_recipient", label: "Arrivée destinataire" },
+                  { value: "unreachable_recipient", label: "Destinataire injoignable" },
+                  { value: "refused", label: "Refusée" },
+                  { value: "delivered", label: "Livrée" },
+                  { value: "cancelled", label: "Annulée" },
+                ]}
+              />
+              <DeliveryTable
+                deliveries={filteredDeliveries}
+                expandable={true}
+                preferStackedMobileCards
+                onEditDelivery={handleUpdateDelivery}
+                onCancelDelivery={handleCancelDelivery}
+                isUpdating={isUpdatingDelivery || deliveriesQuery.isFetching}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="max-h-[min(92dvh,44rem)] w-[calc(100vw-1.5rem)] max-w-lg gap-5 overflow-y-auto overflow-x-hidden p-5 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Détails & mise à jour</DialogTitle>
+          </DialogHeader>
+          {selectedPreDelivery && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-gray-50/60 p-4 space-y-2">
+                <p className="text-sm">
+                  <span className="font-medium">Créée le:</span>{" "}
+                  <span className="capitalize">{formatPreDeliveryCreatedAtFrench(selectedPreDelivery)}</span>
+                </p>
+                <p className="text-sm flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-500" />
+                  {selectedPreDelivery.recipient_name || "N/A"}
+                </p>
+                <p className="text-sm flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-gray-500" />
+                  {selectedPreDelivery.recipient_phone_number}
+                </p>
+                <p className="text-sm flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
+                  <span>{selectedPreDelivery.recipient_address_line}</span>
+                </p>
+                <StatusBadge status={selectedPreDelivery.status} />
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label>Adresse de livraison</Label>
+                  <Input
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    placeholder="Adresse complète du destinataire"
+                    className="mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <Label>Valeur du colis ({selectedPreDelivery?.package_value_currency || 'USD'})</Label>
+                  <Input
+                    value={editPackageValue}
+                    onChange={(e) => setEditPackageValue(e.target.value)}
+                    placeholder="Prix du colis"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label>Note</Label>
+                  <Input
+                    value={editNote}
+                    onChange={(e) => setEditNote(e.target.value)}
+                    placeholder="Ajouter une note (optionnel)"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label>Statut</Label>
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionnez le statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="confirmed">Confirmé</SelectItem>
+                      <SelectItem value="no_response">Pas de réponse</SelectItem>
+                      <SelectItem value="not_interested">Pas intéressé</SelectItem>
+                      <SelectItem value="does_not_remember">Ne se souvient pas</SelectItem>
+                      <SelectItem value="beyond_delivery_zone">Hors zone</SelectItem>
+                      <SelectItem value="will_call_us_when_ready">Rappellera</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedStatus === "confirmed" && (
+                  <>
+                    <div>
+                      <Label>Commune</Label>
+                      <Select value={selectedCommuneId} onValueChange={setSelectedCommuneId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionnez la commune" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {communes.map((commune) => (
+                            <SelectItem key={commune.commune_id} value={commune.commune_id}>
+                              {commune.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Quartier</Label>
+                      <Select value={selectedQuartierId} onValueChange={setSelectedQuartierId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionnez le quartier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableQuartiers.map((quartier) => (
+                            <SelectItem key={quartier.id} value={quartier.id.toString()}>
+                              {quartier.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 [&>button]:w-full sm:[&>button]:w-auto">
+            <Button variant="outline" onClick={() => setShowDialog(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleSubmitPreDelivery} disabled={isSubmittingPreDelivery} className="bg-[#2B015F] hover:bg-[#1A0138]">
+              {isSubmittingPreDelivery ? "Mise à jour..." : "Confirmer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+    </div>
+  )
+}
+
+export default function ClosingsPage() {
+  const queryClientRef = useRef<QueryClient>()
+  if (!queryClientRef.current) {
+    queryClientRef.current = new QueryClient()
+  }
+  return (
+    <QueryClientProvider client={queryClientRef.current}>
+      <ClosingsContent />
+    </QueryClientProvider>
+  )
+}
