@@ -80,8 +80,8 @@ export default function Home() {
                   <div className="w-14 h-14 bg-[#22D3EE]/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
                     <BarChart3 className="h-7 w-7 text-[#22D3EE]" />
                   </div>
-                  <h3 className="text-xl font-bold mb-2 text-white">Données actionnables</h3>
-                  <p className="text-white/60 text-sm">Analytics et rapports pour optimiser vos opérations en temps réel</p>
+                  <h3 className="text-xl font-bold mb-2 text-white">Optimisation par IA</h3>
+                  <p className="text-white/60 text-sm">Données actionnables et algorithmes prédictifs pour optimiser vos opérations en temps réel</p>
                 </div>
               </div>
             </div>

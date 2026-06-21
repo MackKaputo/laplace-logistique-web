@@ -290,127 +290,136 @@ function MobileDelivererPage() {
           return (
             <div
               key={preDelivery.pre_delivery_id}
-              className="overflow-hidden rounded-xl border bg-card shadow-sm"
+              className={`rounded-lg border shadow-sm p-4 ${
+                isDelivered 
+                  ? 'bg-gray-50 border-gray-200 opacity-75' 
+                  : 'bg-white border-[#B08968]/10'
+              }`}
             >
-              <div className="flex items-start justify-between gap-3 p-4 pb-2">
-                <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2B015F]/80">
-                    {customerName}
-                  </p>
-                  <h3 className="text-base font-semibold leading-tight">
-                    {formatDetailValue(preDelivery.recipient_name)}
-                  </h3>
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    <span>{createdDate}</span>
+              <div className="space-y-3">
+                {/* Header - Customer and Status */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#B08968]">
+                      {formatDetailValue(preDelivery.package_description)}
+                    </p>
+                    <h3 className="text-sm font-bold text-[#1a1009] leading-tight">
+                      {packageValue}
+                    </h3>
+                    <div className="flex items-center gap-1 text-xs text-[#B08968]/60">
+                      <CalendarDays className="h-3 w-3 shrink-0" aria-hidden />
+                      <span>{createdDate}</span>
+                    </div>
                   </div>
-                </div>
-                <span className="max-w-[45%] rounded-full bg-[#2B015F]/10 px-2.5 py-1 text-right text-[11px] font-semibold capitalize leading-tight text-[#2B015F]">
-                  {getStatusBadgeLabel(preDelivery.status)}
-                </span>
-              </div>
-
-              <div className="space-y-3 px-4 pb-4 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  {phoneHref && (
-                    <Button asChild size="sm" className="h-9 flex-1 bg-[#2B015F] hover:bg-[#1A0138] sm:flex-none">
-                      <a href={phoneHref} aria-label={`Appeler ${preDelivery.recipient_phone_number}`}>
-                        <Phone className="h-4 w-4" />
-                        Appeler
-                      </a>
-                    </Button>
-                  )}
-                  {whatsappHref && (
-                    <Button asChild size="sm" variant="outline" className="h-9 flex-1 border-green-600 text-green-700 hover:bg-green-50 sm:flex-none">
-                      <a
-                        href={whatsappHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Contacter ${preDelivery.recipient_phone_number} sur WhatsApp`}
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                        WhatsApp
-                      </a>
-                    </Button>
-                  )}
-                </div>
-
-                {preDelivery.recipient_phone_number && (
-                  <a
-                    href={phoneHref || undefined}
-                    className="inline-flex items-center gap-2 text-[#2563eb] font-medium underline-offset-2 touch-manipulation"
-                  >
-                    <Phone className="h-4 w-4 shrink-0" aria-hidden />
-                    <span>{preDelivery.recipient_phone_number}</span>
-                  </a>
-                )}
-
-                <div className="flex gap-2 text-muted-foreground">
-                  <MapPin className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-                  <p className="text-xs leading-snug break-words">{formatDetailValue(preDelivery.recipient_address_line)}</p>
-                </div>
-
-                <p className="text-xs leading-snug text-muted-foreground line-clamp-2">
-                  {formatDetailValue(preDelivery.package_description)}
-                </p>
-
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="text-xs uppercase text-muted-foreground">Valeur</span>
-                  <span className="font-semibold tabular-nums">
-                    {packageValue}
-                    {!preDelivery.is_delivery_price_included ? (
-                      <span className="ml-2 text-[10px] font-normal text-orange-600">(+ frais livr.)</span>
-                    ) : null}
+                  <span className={`rounded-full px-2 py-0.5 text-right text-[10px] font-semibold capitalize leading-tight border ${
+                    isDelivered 
+                      ? 'bg-green-100 text-green-700 border-green-200' 
+                      : 'bg-[#22D3EE]/20 text-[#22D3EE] border-[#22D3EE]/30'
+                  }`}>
+                    {getStatusBadgeLabel(preDelivery.status)}
                   </span>
                 </div>
+                {/* 📍 ADDRESS - COMPACT BUT PRIORITY */}
+                <div className="bg-gradient-to-r from-[#22D3EE]/10 to-[#06b6d4]/10 rounded-lg p-3 border border-[#22D3EE]/30">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 text-[#22D3EE] shrink-0 mt-0.5" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-[#1a1009] mb-1">📍 Adresse</p>
+                      <p className="text-xs text-[#1a1009] font-medium leading-snug break-words">
+                        {formatDetailValue(preDelivery.recipient_address_line)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-                {/* Also display the preferred_delivery_date  */}
+                {/* 📅 DELIVERY DATE - HIGH PRIORITY */}
                 {preDelivery.preferred_delivery_date && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 shrink-0" aria-hidden />
-                      <span className="text-xs">
-                        Date/Heure: {formatPreferredDeliveryDate(preDelivery.preferred_delivery_date)}
-                      </span>
+                  <div className="bg-gradient-to-r from-orange-100 to-yellow-100 rounded-lg p-3 border-2 border-orange-300 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Calendar className="h-3 w-3 text-white" aria-hidden />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-orange-800 mb-1 uppercase tracking-wide">📅 DATE DE LIVRAISON</p>
+                        <p className="text-sm font-bold text-orange-900 leading-snug">
+                          {formatPreferredDeliveryDate(preDelivery.preferred_delivery_date)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
+
+                {/* Contact - Only show for active orders */}
+                {!isDelivered && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {phoneHref && (
+                      <Button asChild size="sm" className="h-8 flex-1 bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE] sm:flex-none text-xs font-semibold">
+                        <a href={phoneHref} aria-label={`Appeler ${preDelivery.recipient_phone_number}`}>
+                          <Phone className="h-3 w-3" />
+                          Appeler
+                        </a>
+                      </Button>
+                    )}
+                    {whatsappHref && (
+                      <Button asChild size="sm" variant="outline" className="h-8 flex-1 border-green-600 text-green-700 hover:bg-green-50 sm:flex-none text-xs font-semibold">
+                        <a
+                          href={whatsappHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Contacter ${preDelivery.recipient_phone_number} sur WhatsApp`}
+                        >
+                          <MessageCircle className="h-3 w-3" />
+                          WhatsApp
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {/* Value Only - Since product is now at top */}
+                <div className="flex items-center justify-end gap-3 text-xs text-gray-400">
+                  <Package className="h-3 w-3 text-gray-300" aria-hidden />
+                  <span>Valeur: {packageValue}</span>
+                </div>
               </div>
 
               {!isDelivered && (
-                <div className="border-t bg-background/95 px-3 py-3 sm:px-4">
+                <div className="border-t border-[#B08968]/20 bg-[#f8fafc] px-3 py-3">
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Button
                       type="button"
-                      className="h-11 w-full bg-green-700 font-medium text-white hover:bg-green-800"
+                      className="h-9 w-full bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 text-xs font-semibold shadow-md transition-all duration-300 border-0"
                       onClick={() => setDeliveryToConfirm(preDelivery)}
                       disabled={isDelivering}
                     >
                       {isDelivering ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
-                        <CheckCircle2 className="h-4 w-4" />
+                        <CheckCircle2 className="h-3 w-3" />
                       )}
-                      {isDelivering ? "Signalement..." : "Signaler comme livrée"}
+                      {isDelivering ? "Signalement..." : "Livrée"}
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
-                      className="h-11 w-full text-orange-700 border-orange-300 hover:bg-orange-50"
+                      className="h-9 w-full text-orange-600 border-orange-300 hover:bg-orange-50 text-xs font-semibold transition-all duration-300"
                       onClick={() => setFailingPreDeliveryId(preDelivery.pre_delivery_id)}
                       disabled={isDelivering}
                     >
-                      Échec de livraison
+                      Échec
                     </Button>
                   </div>
 
                   {failingPreDeliveryId === preDelivery.pre_delivery_id && (
-                    <div className="mt-3 space-y-3 rounded-2xl border border-orange-200 bg-orange-50/80 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <Label htmlFor={`failure-note-${preDelivery.pre_delivery_id}`}>Motif d'échec</Label>
+                    <div className="mt-3 space-y-3 rounded-lg border border-orange-200 bg-orange-50/90 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <Label htmlFor={`failure-note-${preDelivery.pre_delivery_id}`} className="text-[#1a1009] font-medium text-xs">Motif d'échec</Label>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => setFailingPreDeliveryId(null)}
+                          className="text-[#B08968] hover:text-[#1a1009] text-xs h-6 px-2"
                         >
                           Annuler
                         </Button>
@@ -424,21 +433,22 @@ function MobileDelivererPage() {
                             [preDelivery.pre_delivery_id]: event.target.value,
                           }))
                         }
-                        placeholder="Expliquez brièvement ce qui s'est passé"
-                        rows={4}
+                        placeholder="Expliquez brièvement..."
+                        rows={3}
+                        className="border-[#B08968]/20 focus:border-orange-400 text-xs"
                       />
                       <Button
                         type="button"
-                        className="h-11 w-full bg-orange-600 font-medium text-white hover:bg-orange-700"
+                        className="h-9 w-full bg-gradient-to-r from-orange-600 to-orange-700 text-white hover:from-orange-700 hover:to-orange-800 text-xs font-semibold shadow-md transition-all duration-300 border-0"
                         onClick={() => handleSignalDeliveryFailed(preDelivery)}
                         disabled={isDelivering}
                       >
                         {isDelivering ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
-                          <MessageCircle className="h-4 w-4" />
+                          <MessageCircle className="h-3 w-3" />
                         )}
-                        {isDelivering ? "Signalement..." : "Confirmer l'échec"}
+                        {isDelivering ? "Signalement..." : "Confirmer"}
                       </Button>
                     </div>
                   )}
@@ -508,10 +518,14 @@ function MobileDelivererPage() {
 
   if (profile) {
     return (
-      <div className="mx-auto w-full max-w-7xl min-h-[calc(100dvh-3.5rem)] overflow-x-hidden px-3 pb-28 pt-4 sm:px-4 sm:pb-10 lg:px-8 lg:py-8 space-y-4 sm:space-y-6">
+      <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] pt-24">
+        <div className="mx-auto w-full max-w-7xl px-3 pb-28 pt-4 sm:px-4 sm:pb-10 lg:px-8 lg:py-8 space-y-4 sm:space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold text-[#2B015F] sm:text-2xl"> {profile.first_name} {profile.last_name}</h1>
+            <h1 className="text-3xl font-bold text-[#1a1009] mb-2">Livreur Mobile</h1>
+            <p className="text-[#B08968]">
+              {profile.first_name} {profile.last_name}
+            </p>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
             <Button 
@@ -531,18 +545,18 @@ function MobileDelivererPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-2 gap-2 rounded-2xl border border-[#D9C6FF] bg-[#F6F0FF] p-1">
+          <TabsList className="grid w-full grid-cols-2 gap-2 rounded-xl border border-[#B08968]/20 bg-white p-1">
             <TabsTrigger
               value="commandes"
-              className="rounded-2xl px-3 py-2 text-sm font-semibold text-[#5B21B6] transition data-[state=active]:bg-white data-[state=active]:text-[#2B0756] data-[state=active]:shadow-sm"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-[#1a1009] transition data-[state=active]:bg-[#22D3EE] data-[state=active]:text-white data-[state=active]:shadow-md"
             >
               Commandes ({preDeliveriesQuery.data?.length || 0})
             </TabsTrigger>
             <TabsTrigger
               value="mes-commandes"
-              className="rounded-2xl px-3 py-2 text-sm font-semibold text-[#5B21B6] transition data-[state=active]:bg-white data-[state=active]:text-[#2B0756] data-[state=active]:shadow-sm"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-[#1a1009] transition data-[state=active]:bg-[#22D3EE] data-[state=active]:text-white data-[state=active]:shadow-md"
             >
-              Mes commandes ({assignedPreDeliveriesQuery.data?.length || 0})
+              Mes commandes ({activeAssignedPreDeliveries.length})
             </TabsTrigger>
           </TabsList>
 
@@ -587,15 +601,27 @@ function MobileDelivererPage() {
                                 </span>
                               </div>
                             )}
-                            <p className="mt-3 rounded-2xl border border-[#E9D5FF] bg-[#F8F0FF] px-3 py-2 text-sm font-medium text-[#5B21B6] shadow-sm">
+                            {/* Address - Moved above product */}
+                            <div className="bg-gradient-to-r from-[#22D3EE]/10 to-[#06b6d4]/10 rounded-xl p-3 border border-[#22D3EE]/30">
+                              <div className="flex items-start gap-2">
+                                <MapPin className="h-4 w-4 text-[#22D3EE] shrink-0 mt-0.5" aria-hidden />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-medium text-[#1a1009] mb-1">📍 Adresse de livraison</p>
+                                  <p className="text-sm text-[#1a1009] font-medium leading-snug break-words">
+                                    {preDelivery.recipient_address_line}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Product - Now below address */}
+                            <p className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
                               {preDelivery.package_description || "Aucune description fournie"}
                             </p>
-                            <p className="text-sm text-muted-foreground">{preDelivery.recipient_address_line}</p>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleTakePreDelivery(preDelivery)}
-                              className="w-full bg-[#2B015F] text-white hover:bg-[#1A0138] mt-3"
+                              className="w-full bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE] font-semibold shadow-lg hover:shadow-xl transition-all duration-300 border-0 mt-3"
                             >
                               Prendre
                             </Button>
@@ -630,16 +656,16 @@ function MobileDelivererPage() {
                 ) : (
                   <Tabs value={assignedTab} onValueChange={setAssignedTab} className="space-y-3">
                     <div className="px-3 pt-3 sm:px-4">
-                      <TabsList className="grid w-full grid-cols-2 gap-2 rounded-2xl border border-[#D1FAE5] bg-[#ECFDF5] p-1">
+                      <TabsList className="grid w-full grid-cols-2 gap-2 rounded-lg border border-[#B08968]/20 bg-white p-1">
                         <TabsTrigger
                           value="en-cours"
-                          className="rounded-2xl px-3 py-2 text-sm font-semibold text-[#166534] transition data-[state=active]:bg-white data-[state=active]:text-[#0F3F2D] data-[state=active]:shadow-sm"
+                          className="rounded-md px-2 py-1.5 text-xs font-medium text-[#1a1009] transition data-[state=active]:bg-[#22D3EE] data-[state=active]:text-white data-[state=active]:shadow-sm"
                         >
                           En cours ({activeAssignedPreDeliveries.length})
                         </TabsTrigger>
                         <TabsTrigger
                           value="livrees"
-                          className="rounded-2xl px-3 py-2 text-sm font-semibold text-[#166534] transition data-[state=active]:bg-white data-[state=active]:text-[#0F3F2D] data-[state=active]:shadow-sm"
+                          className="rounded-md px-2 py-1.5 text-xs font-medium text-[#1a1009] transition data-[state=active]:bg-[#22D3EE] data-[state=active]:text-white data-[state=active]:shadow-sm"
                         >
                           Livrées ({deliveredAssignedPreDeliveries.length})
                         </TabsTrigger>
@@ -698,51 +724,52 @@ function MobileDelivererPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto w-full max-w-md px-3 py-10 sm:px-4 sm:py-14">
-      <Card className="shadow-sm border-border/80">
-        <CardHeader>
-          <CardTitle>Accès Mobile Deliverer</CardTitle>
-          <CardDescription>
-            Entrez votre code d'accès pour consulter vos informations
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="accessCode">Code d'accès</Label>
-            <Input
-              id="accessCode"
-              type="text"
-              value={accessCode}
-              onChange={(e) => setAccessCode(e.target.value)}
-              placeholder="Ex: 105637"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleLogin()
-              }}
-              disabled={isLoggingIn}
-              className="mt-1"
-            />
+    <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] pt-24 flex items-center justify-center">
+      <div className="mx-auto w-full max-w-md px-3 py-10 sm:px-4 sm:py-14">
+        <div className="bg-white rounded-xl border border-[#B08968]/10 shadow-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-[#1a1009] to-[#2a1809] p-6">
+            <h2 className="text-xl font-bold text-white">Accès Livreur Mobile</h2>
+            <p className="text-[#B08968]/80 text-sm mt-1">Entrez votre code d'accès pour consulter vos informations</p>
           </div>
-          <Button 
-            onClick={handleLogin} 
-            disabled={isLoggingIn} 
-            className="w-full bg-[#2B015F] hover:bg-[#1A0138]"
-          >
-            {isLoggingIn ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Connexion...
-              </>
-            ) : (
-              "Se connecter"
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+          <div className="p-6 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="accessCode" className="text-[#1a1009] font-medium">Code d'accès</Label>
+              <Input
+                id="accessCode"
+                type="text"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value)}
+                placeholder="Ex: 105637"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleLogin()
+                }}
+                disabled={isLoggingIn}
+                className="border-[#B08968]/20 focus:border-[#22D3EE]"
+              />
+            </div>
+            <Button 
+              onClick={handleLogin} 
+              disabled={isLoggingIn} 
+              className="w-full bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE] font-semibold shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+            >
+              {isLoggingIn ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connexion...
+                </>
+              ) : (
+                "Se connecter"
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

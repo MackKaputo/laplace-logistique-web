@@ -710,40 +710,48 @@ function ClosingsContent() {
 
   if (!profile) {
     return (
-      <div className="mx-auto w-full max-w-md px-3 py-10 sm:px-4 sm:py-14">
-        <Card className="shadow-sm border-border/80">
-          <CardHeader>
-            <CardTitle>Accès closings</CardTitle>
-            <CardDescription>Saisissez votre code d'accès pour consulter les clients assignés.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="accessCode">Code d'accès</Label>
-              <Input
-                id="accessCode"
-                placeholder="Ex: 689556"
-                value={accessCode}
-                onChange={(e) => setAccessCode(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleLogin()
-                }}
-              />
+      <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] pt-24 flex items-center justify-center">
+        <div className="mx-auto w-full max-w-md px-3 py-10 sm:px-4 sm:py-14">
+          <div className="bg-white rounded-xl border border-[#B08968]/10 shadow-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-[#1a1009] to-[#2a1809] p-6">
+              <h2 className="text-xl font-bold text-white">Accès Closings</h2>
+              <p className="text-[#B08968]/80 text-sm mt-1">Saisissez votre code d'accès pour consulter les clients assignés.</p>
             </div>
-            <Button onClick={handleLogin} disabled={isLoggingIn} className="w-full bg-[#2B015F] hover:bg-[#1A0138]">
-              {isLoggingIn ? "Connexion..." : "Se connecter"}
-            </Button>
-          </CardContent>
-        </Card>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="accessCode" className="text-[#1a1009] font-medium">Code d'accès</Label>
+                <Input
+                  id="accessCode"
+                  placeholder="Ex: 689556"
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleLogin()
+                  }}
+                  className="border-[#B08968]/20 focus:border-[#22D3EE]"
+                />
+              </div>
+              <Button 
+                onClick={handleLogin} 
+                disabled={isLoggingIn} 
+                className="w-full bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE] font-semibold shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+              >
+                {isLoggingIn ? "Connexion..." : "Se connecter"}
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl min-h-[calc(100dvh-3.5rem)] overflow-x-hidden px-3 pb-28 pt-4 sm:px-4 sm:pb-10 lg:px-8 lg:py-8 lg:pb-12 space-y-4 sm:space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] pt-24">
+      <div className="mx-auto w-full max-w-7xl px-3 pb-28 pt-4 sm:px-4 sm:pb-10 lg:px-8 lg:py-8 lg:pb-12 space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-[#2B015F] sm:text-2xl">Closings</h1>
-          <p className="text-xs text-muted-foreground mt-1 sm:text-sm">
+          <h1 className="text-3xl font-bold text-[#1a1009] mb-2">Closings</h1>
+          <p className="text-[#B08968]">
             {profile.first_name} {profile.last_name} ({profile.role})
           </p>
         </div>
@@ -1449,6 +1457,7 @@ function ClosingsContent() {
         </DialogContent>
       </Dialog>
 
+      </div>
     </div>
   )
 }
