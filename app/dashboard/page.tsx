@@ -104,9 +104,14 @@ export default function Dashboard() {
         icon: <Truck className="h-3 w-3" />
       },
       failed_pickup: {
-        label: "Échec",
+        label: "Échec collecte",
         color: "bg-red-100 text-red-800 border-red-200",
         icon: <AlertCircle className="h-3 w-3" />
+      },
+      delivery_failed: {
+        label: "Échec livraison",
+        color: "bg-red-200 text-red-900 border-red-300",
+        icon: <XCircle className="h-3 w-3" />
       },
       no_response: {
         label: "Pas de réponse",
@@ -262,7 +267,8 @@ export default function Dashboard() {
                   <SelectItem value="assigned">Assigné</SelectItem>
                   <SelectItem value="delivery_start_to_recipient">En livraison</SelectItem>
                   <SelectItem value="delivered">Livré</SelectItem>
-                  <SelectItem value="failed_pickup">Échec</SelectItem>
+                  <SelectItem value="failed_pickup">Échec collecte</SelectItem>
+                  <SelectItem value="delivery_failed">Échec livraison</SelectItem>
                   <SelectItem value="no_response">Pas de réponse</SelectItem>
                   <SelectItem value="not_interested">Pas intéressé</SelectItem>
                   <SelectItem value="does_not_remember">Ne se souvient pas</SelectItem>
