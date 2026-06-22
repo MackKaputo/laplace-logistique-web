@@ -19,8 +19,8 @@ export default function DashboardSettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#2B015F]"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#22D3EE]"></div>
       </div>
     )
   }

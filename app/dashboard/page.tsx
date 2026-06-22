@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Package, LogOut, User, Settings, Search, Filter, Phone, MapPin, CheckCircle, Clock, AlertCircle, Truck } from "lucide-react"
+import { Package, LogOut, User, Settings, Search, Filter, Phone, MapPin, CheckCircle, Clock, AlertCircle, Truck, XCircle, PhoneOff, HelpCircle, MapPinOff, PhoneCall } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import RoleGuard from "@/components/role-guard"
 import { useRouter } from "next/navigation"
@@ -107,6 +107,36 @@ export default function Dashboard() {
         label: "Échec",
         color: "bg-red-100 text-red-800 border-red-200",
         icon: <AlertCircle className="h-3 w-3" />
+      },
+      no_response: {
+        label: "Pas de réponse",
+        color: "bg-gray-100 text-gray-600 border-gray-200",
+        icon: <PhoneOff className="h-3 w-3" />
+      },
+      confirmed: {
+        label: "Confirmé",
+        color: "bg-green-100 text-green-800 border-green-200",
+        icon: <CheckCircle className="h-3 w-3" />
+      },
+      not_interested: {
+        label: "Pas intéressé",
+        color: "bg-red-100 text-red-700 border-red-200",
+        icon: <XCircle className="h-3 w-3" />
+      },
+      does_not_remember: {
+        label: "Ne se souvient pas",
+        color: "bg-orange-100 text-orange-700 border-orange-200",
+        icon: <HelpCircle className="h-3 w-3" />
+      },
+      beyond_delivery_zone: {
+        label: "Hors zone",
+        color: "bg-purple-100 text-purple-700 border-purple-200",
+        icon: <MapPinOff className="h-3 w-3" />
+      },
+      will_call_us_when_ready: {
+        label: "Rappellera quand prêt",
+        color: "bg-blue-100 text-blue-700 border-blue-200",
+        icon: <PhoneCall className="h-3 w-3" />
       }
     }
 
@@ -187,14 +217,6 @@ export default function Dashboard() {
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={navigateToNewDelivery}
-                  className="bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE] font-semibold shadow-lg hover:shadow-xl transition-all duration-300 border-0"
-                >
-                  <Package className="mr-2 h-4 w-4" />
-                  Nouvelle livraison
-                </Button>
-                
-                <Button
                   variant="outline"
                   onClick={navigateToSettings}
                   className="border-[#B08968]/30 text-[#1a1009] hover:bg-[#B08968]/10 hover:border-[#22D3EE]/50 transition-all duration-300"
@@ -236,10 +258,16 @@ export default function Dashboard() {
                 <SelectContent>
                   <SelectItem value="tous">Tous les statuts</SelectItem>
                   <SelectItem value="unassigned">En attente</SelectItem>
+                  <SelectItem value="confirmed">Confirmé</SelectItem>
                   <SelectItem value="assigned">Assigné</SelectItem>
                   <SelectItem value="delivery_start_to_recipient">En livraison</SelectItem>
                   <SelectItem value="delivered">Livré</SelectItem>
                   <SelectItem value="failed_pickup">Échec</SelectItem>
+                  <SelectItem value="no_response">Pas de réponse</SelectItem>
+                  <SelectItem value="not_interested">Pas intéressé</SelectItem>
+                  <SelectItem value="does_not_remember">Ne se souvient pas</SelectItem>
+                  <SelectItem value="beyond_delivery_zone">Hors zone</SelectItem>
+                  <SelectItem value="will_call_us_when_ready">Rappellera quand prêt</SelectItem>
                 </SelectContent>
               </Select>
             </div>

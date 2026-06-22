@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -11,17 +12,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Menu, X, User, LogOut, Settings, Package, Zap } from "lucide-react"
+import { Menu, X, User, LogOut, Settings, Zap } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-
-const navLinks = [
-  { label: "Suivre un colis", href: "/tracking", icon: <Package className="h-4 w-4" /> },
-  { label: "Tableau de bord", href: "/dashboard", icon: <Zap className="h-4 w-4" /> },
-]
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { user, logout } = useAuth()
+  const pathname = usePathname()
+  const showDashboardLink = user && (pathname === "/" || pathname?.startsWith("/dashboard"))
 
   return (
     <>
@@ -41,16 +39,15 @@ export default function Navbar() {
 
             {/* Desktop center links */}
             <nav className="hidden md:flex items-center gap-1">
-              {navLinks.map((link) => (
+              {showDashboardLink && (
                 <Link
-                  key={link.href}
-                  href={link.href}
+                  href="/dashboard"
                   className="flex items-center gap-2 px-4 py-2 text-sm text-[#B08968]/80 hover:text-white hover:bg-white/5 rounded-lg transition-all duration-200"
                 >
-                  {link.icon}
-                  {link.label}
+                  <Zap className="h-4 w-4" />
+                  Tableau de bord
                 </Link>
-              ))}
+              )}
             </nav>
 
             {/* Desktop auth */}
@@ -138,17 +135,16 @@ export default function Navbar() {
         <div className="p-5 space-y-6">
           {/* Mobile nav links */}
           <nav className="space-y-1">
-            {navLinks.map((link) => (
+            {showDashboardLink && (
               <Link
-                key={link.href}
-                href={link.href}
+                href="/dashboard"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-3 px-3 py-3 rounded-xl text-[#B08968]/80 hover:text-white hover:bg-white/5 transition-all duration-200"
               >
-                <span className="text-[#22D3EE]">{link.icon}</span>
-                {link.label}
+                <span className="text-[#22D3EE]"><Zap className="h-4 w-4" /></span>
+                Tableau de bord
               </Link>
-            ))}
+            )}
           </nav>
 
           <div className="h-px bg-[#B08968]/10" />

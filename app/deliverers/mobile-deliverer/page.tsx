@@ -582,15 +582,9 @@ function MobileDelivererPage() {
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <h3 className="font-semibold">{preDelivery.recipient_name}</h3>
-                                {preDelivery.customer?.organizationName && (
-                                  <p className="text-xs text-muted-foreground">{preDelivery.customer.organizationName}</p>
-                                )}
                               </div>
                               <div className="text-right">
                                 <p className="font-semibold">{preDelivery.package_value_amount} {preDelivery.package_value_currency}</p>
-                                {!preDelivery.is_delivery_price_included && (
-                                  <p className="text-xs text-orange-600">+ frais livr.</p>
-                                )}
                               </div>
                             </div>
                             {preDelivery.preferred_delivery_date && (

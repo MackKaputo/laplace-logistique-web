@@ -331,12 +331,12 @@ export function GoogleSheetsIntegration() {
         <div className="flex items-center justify-center py-20">
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
-              <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center animate-pulse">
-                <FileSpreadsheet className="h-6 w-6 text-primary" />
+              <div className="h-12 w-12 rounded-2xl bg-[#22D3EE]/10 flex items-center justify-center animate-pulse">
+                <FileSpreadsheet className="h-6 w-6 text-[#22D3EE]" />
               </div>
-              <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[#FBC140] animate-bounce" />
+              <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[#22D3EE] animate-bounce" />
             </div>
-            <p className="text-sm text-muted-foreground animate-pulse">
+            <p className="text-sm text-[#B08968]/60 animate-pulse">
               Chargement de vos integrations...
             </p>
           </div>
@@ -358,7 +358,7 @@ export function GoogleSheetsIntegration() {
         <>
           {/* Empty state / Intro card */}
       {currentStep === "connect" && headers.length === 0 && (
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/[0.03] via-background to-[#FBC140]/[0.05] p-8 md:p-10">
+        <div className="relative overflow-hidden rounded-2xl border border-[#B08968]/15 bg-gradient-to-br from-[#22D3EE]/[0.03] via-white to-[#B08968]/[0.04] p-8 md:p-10">
           {/* Decorative grid */}
           <div className="absolute inset-0 opacity-[0.03]" style={{
             backgroundImage: "linear-gradient(hsl(var(--primary)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary)) 1px, transparent 1px)",
@@ -368,16 +368,16 @@ export function GoogleSheetsIntegration() {
           <div className="relative flex flex-col lg:flex-row items-start gap-8">
             {/* Left: Content */}
             <div className="flex-1 space-y-6">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#FBC140]/30 bg-[#FBC140]/10 px-3 py-1">
-                <Zap className="h-3.5 w-3.5 text-[#FBC140]" />
-                <span className="text-xs font-semibold text-primary">Import automatique</span>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#22D3EE]/30 bg-[#22D3EE]/10 px-3 py-1">
+                <Zap className="h-3.5 w-3.5 text-[#22D3EE]" />
+                <span className="text-xs font-semibold text-[#1a1009]">Import automatique</span>
               </div>
 
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-primary text-balance leading-tight">
+                <h3 className="text-2xl font-bold text-[#1a1009] text-balance leading-tight">
                   Importez vos commandes directement depuis Google Sheets
                 </h3>
-                <p className="text-muted-foreground leading-relaxed max-w-lg">
+                <p className="text-[#B08968] leading-relaxed max-w-lg">
                   Connectez la feuille Google liee a votre boutique{" "}
                   <span className="inline-flex items-center gap-1 font-semibold text-foreground">
                     <ShoppingBag className="h-3.5 w-3.5" />
@@ -388,22 +388,22 @@ export function GoogleSheetsIntegration() {
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row gap-3 text-sm text-[#B08968]">
                 <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Check className="h-3 w-3 text-primary" />
+                  <div className="h-6 w-6 rounded-full bg-[#22D3EE]/10 flex items-center justify-center">
+                    <Check className="h-3 w-3 text-[#22D3EE]" />
                   </div>
                   <span>Shopify, WooCommerce, etc.</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Check className="h-3 w-3 text-primary" />
+                  <div className="h-6 w-6 rounded-full bg-[#22D3EE]/10 flex items-center justify-center">
+                    <Check className="h-3 w-3 text-[#22D3EE]" />
                   </div>
                   <span>Synchronisation instantanee</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Check className="h-3 w-3 text-primary" />
+                  <div className="h-6 w-6 rounded-full bg-[#22D3EE]/10 flex items-center justify-center">
+                    <Check className="h-3 w-3 text-[#22D3EE]" />
                   </div>
                   <span>Mapping personnalise</span>
                 </div>
@@ -466,11 +466,11 @@ export function GoogleSheetsIntegration() {
 
       {/* Step 1: Connect */}
       {currentStep === "connect" && (
-        <Card className="border border-border shadow-sm">
+        <Card className="border border-[#B08968]/15 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-primary">
-              <div className="h-8 w-8 rounded-lg bg-[#0F9D58]/10 flex items-center justify-center">
-                <Link2 className="h-4 w-4 text-[#0F9D58]" />
+            <CardTitle className="flex items-center gap-2 text-[#1a1009]">
+              <div className="h-8 w-8 rounded-lg bg-[#22D3EE]/10 flex items-center justify-center">
+                <Link2 className="h-4 w-4 text-[#22D3EE]" />
               </div>
               Connecter votre Google Sheet
             </CardTitle>
@@ -508,7 +508,7 @@ export function GoogleSheetsIntegration() {
             )}
 
             <Button
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              className="bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE] font-semibold border-0"
               onClick={handleFetchHeaders}
               disabled={!sheetUrl || !sheetName || fetchingHeaders}
             >
@@ -530,11 +530,11 @@ export function GoogleSheetsIntegration() {
 
       {/* Step 2: Map columns */}
       {currentStep === "map" && (
-        <Card className="border border-border shadow-sm">
+        <Card className="border border-[#B08968]/15 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-primary">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Table2 className="h-4 w-4 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-[#1a1009]">
+              <div className="h-8 w-8 rounded-lg bg-[#22D3EE]/10 flex items-center justify-center">
+                <Table2 className="h-4 w-4 text-[#22D3EE]" />
               </div>
               Mapper les colonnes
             </CardTitle>
@@ -544,11 +544,11 @@ export function GoogleSheetsIntegration() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-[#B08968] bg-[#f8fafc] rounded-lg p-3 border border-[#B08968]/10">
               <FileSpreadsheet className="h-4 w-4 text-[#0F9D58]" />
-              <span className="font-medium text-foreground">{sheetName}</span>
-              <span className="text-muted-foreground">-</span>
-              <span className="truncate max-w-[300px] font-mono text-xs">{sheetUrl}</span>
+              <span className="font-medium text-[#1a1009]">{sheetName}</span>
+              <span className="text-[#B08968]/60">-</span>
+              <span className="truncate max-w-[300px] font-mono text-xs text-[#B08968]">{sheetUrl}</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -566,14 +566,14 @@ export function GoogleSheetsIntegration() {
                 <div key={field.key} className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Label className="font-medium text-foreground">{field.label}</Label>
+                      <Label className="font-medium text-[#1a1009]">{field.label}</Label>
                       {field.required && (
-                        <Badge variant="outline" className="text-xs border-[#FBC140] text-primary">
+                        <Badge variant="outline" className="text-xs border-[#22D3EE]/40 text-[#22D3EE]">
                           Requis
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{field.description}</p>
+                    <p className="text-xs text-[#B08968]/60 mt-0.5">{field.description}</p>
                   </div>
                   <Select
                     value={columnMapping[field.key] || ""}
@@ -601,7 +601,7 @@ export function GoogleSheetsIntegration() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="next-row">Prochaine ligne a synchroniser</Label>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-[#B08968]/60">
                   {"La valeur de l'identifiant a partir de laquelle commencer (ex: #2787)"}
                 </p>
                 <Input
@@ -613,7 +613,7 @@ export function GoogleSheetsIntegration() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="currency">Devise</Label>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-[#B08968]/60">
                   La devise utilisee pour les montants de commande.
                 </p>
                 <Select value={currency} onValueChange={setCurrency}>
@@ -644,7 +644,7 @@ export function GoogleSheetsIntegration() {
                 Retour
               </Button>
               <Button
-                className="bg-[#FBC140] text-primary font-semibold hover:bg-[#FBC140]/90"
+                className="bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE] font-semibold border-0"
                 onClick={handleSaveIntegration}
                 disabled={saving}
               >
@@ -667,24 +667,24 @@ export function GoogleSheetsIntegration() {
 
       {/* Step 3: Done */}
       {currentStep === "done" && (
-        <Card className="border border-border shadow-sm overflow-hidden">
+        <Card className="border border-[#B08968]/15 shadow-sm overflow-hidden">
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#0F9D58]/5 via-transparent to-[#FBC140]/5" />
+            <div className="absolute inset-0 bg-gradient-to-br from-[#22D3EE]/5 via-transparent to-[#B08968]/5" />
             <CardContent className="relative flex flex-col items-center justify-center py-16 text-center">
               <div className="relative mb-6">
-                <div className="h-16 w-16 rounded-2xl bg-[#0F9D58]/10 flex items-center justify-center">
-                  <CheckCircle2 className="h-8 w-8 text-[#0F9D58]" />
+                <div className="h-16 w-16 rounded-2xl bg-[#22D3EE]/10 flex items-center justify-center">
+                  <CheckCircle2 className="h-8 w-8 text-[#22D3EE]" />
                 </div>
-                <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#FBC140] flex items-center justify-center">
-                  <Zap className="h-3 w-3 text-primary" />
+                <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#22D3EE] flex items-center justify-center">
+                  <Zap className="h-3 w-3 text-white" />
                 </div>
               </div>
-              <h3 className="text-xl font-bold text-primary mb-2">Integration configuree!</h3>
-              <p className="text-muted-foreground max-w-md mb-8 leading-relaxed">
+              <h3 className="text-xl font-bold text-[#1a1009] mb-2">Integration configuree!</h3>
+              <p className="text-[#B08968] max-w-md mb-8 leading-relaxed">
                 {"Votre Google Sheet est maintenant connecte a DareDare. Vos commandes seront synchronisees automatiquement."}
               </p>
               <Button
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                className="bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE] font-semibold border-0"
                 onClick={() => {
                   fetchExistingIntegration()
                   setAddingNewSheet(false)
@@ -726,8 +726,8 @@ function IntegrationPageHeader({ connected = false, onAddSheet }: { connected?: 
   return (
     <div className="flex items-start justify-between gap-4">
       <div>
-        <h2 className="text-xl font-bold text-primary mb-1">Integrations</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="text-xl font-bold text-[#1a1009] mb-1">Integrations</h2>
+        <p className="text-sm text-[#B08968]">
           {connected
             ? "Gerez vos integrations et synchronisez vos commandes."
             : "Connectez vos plateformes pour importer automatiquement vos commandes."}
@@ -767,17 +767,17 @@ function StepIndicator({
       <div
         className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-all duration-300 ${
           completed
-            ? "bg-[#0F9D58]/10 text-[#0F9D58] ring-2 ring-[#0F9D58]/20"
+            ? "bg-[#22D3EE]/10 text-[#22D3EE] ring-2 ring-[#22D3EE]/20"
             : active
-              ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-              : "bg-muted text-muted-foreground"
+              ? "bg-[#22D3EE] text-white shadow-lg shadow-[#22D3EE]/20"
+              : "bg-[#f1f5f9] text-[#B08968]"
         }`}
       >
         {completed ? <Check className="h-4 w-4" /> : stepNumber}
       </div>
       <span
         className={`text-sm font-medium transition-colors duration-300 ${
-          active ? "text-primary" : completed ? "text-[#0F9D58]" : "text-muted-foreground"
+          active ? "text-[#1a1009]" : completed ? "text-[#22D3EE]" : "text-[#B08968]/60"
         }`}
       >
         {label}
@@ -816,9 +816,9 @@ function ExistingIntegrationView({
   return (
     <div className="space-y-4">
       {/* Main integration card */}
-      <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <div className="relative overflow-hidden rounded-2xl border border-[#B08968]/15 bg-white shadow-sm">
         {/* Top gradient accent */}
-        <div className="h-1 w-full bg-gradient-to-r from-[#0F9D58] via-[#FBC140] to-primary" />
+        <div className="h-1 w-full bg-gradient-to-r from-[#22D3EE] via-[#06b6d4] to-[#1a1009]" />
 
         <div className="p-6 space-y-6">
           {/* Header with status */}
@@ -834,8 +834,8 @@ function ExistingIntegrationView({
                 </div>
               </div>
               <div>
-                <h3 className="font-bold text-foreground text-lg">Google Sheets</h3>
-                <p className="text-sm text-muted-foreground">{integration.sheet_name}</p>
+                <h3 className="font-bold text-[#1a1009] text-lg">Google Sheets</h3>
+                <p className="text-sm text-[#B08968]">{integration.sheet_name}</p>
               </div>
             </div>
             <Badge
@@ -850,15 +850,15 @@ function ExistingIntegrationView({
           </div>
 
           {/* Sync status banner */}
-          <div className="rounded-xl bg-muted/50 border border-border p-4">
+          <div className="rounded-xl bg-[#f8fafc] border border-[#B08968]/10 p-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="flex items-start gap-3">
-                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Clock className="h-4 w-4 text-primary" />
+                <div className="h-9 w-9 rounded-lg bg-[#22D3EE]/10 flex items-center justify-center shrink-0">
+                  <Clock className="h-4 w-4 text-[#22D3EE]" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Prochaine ligne</p>
-                  <p className="text-sm font-semibold text-foreground mt-0.5 truncate">
+                  <p className="text-xs font-medium text-[#B08968]/60 uppercase tracking-wider">Prochaine ligne</p>
+                  <p className="text-sm font-semibold text-[#1a1009] mt-0.5 truncate">
                     {integration.next_row_to_sync_identifier || "---"}
                   </p>
                 </div>
@@ -868,28 +868,28 @@ function ExistingIntegrationView({
                   <CheckCircle2 className="h-4 w-4 text-[#0F9D58]" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Derniere sync</p>
-                  <p className="text-sm font-semibold text-foreground mt-0.5 truncate">
+                  <p className="text-xs font-medium text-[#B08968]/60 uppercase tracking-wider">Derniere sync</p>
+                  <p className="text-sm font-semibold text-[#1a1009] mt-0.5 truncate">
                     {integration.last_synced_row_identifier || "Aucune"}
                   </p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="h-9 w-9 rounded-lg bg-[#FBC140]/10 flex items-center justify-center shrink-0">
-                  <Activity className="h-4 w-4 text-[#FBC140]" />
+                <div className="h-9 w-9 rounded-lg bg-[#B08968]/10 flex items-center justify-center shrink-0">
+                  <Activity className="h-4 w-4 text-[#B08968]" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Devise</p>
-                  <p className="text-sm font-semibold text-foreground mt-0.5">{integration.package_value_currency}</p>
+                  <p className="text-xs font-medium text-[#B08968]/60 uppercase tracking-wider">Devise</p>
+                  <p className="text-sm font-semibold text-[#1a1009] mt-0.5">{integration.package_value_currency}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="h-9 w-9 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-                  <Clock className="h-4 w-4 text-blue-500" />
+                <div className="h-9 w-9 rounded-lg bg-[#22D3EE]/10 flex items-center justify-center shrink-0">
+                  <Clock className="h-4 w-4 text-[#22D3EE]" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Synchronise le </p>
-                  <p className="text-sm font-semibold text-foreground mt-0.5 truncate">
+                  <p className="text-xs font-medium text-[#B08968]/60 uppercase tracking-wider">Synchronise le </p>
+                  <p className="text-sm font-semibold text-[#1a1009] mt-0.5 truncate">
                     {integration.last_synced_at
                       ? new Date(integration.last_synced_at).toLocaleString("fr-FR", {
                           day: "2-digit",
