@@ -25,6 +25,7 @@ interface Delivery {
   note: string
   created_at: string
   mobile_deliverer?: {
+    mobile_deliverer_id?: string
     name: string
   }
   mobile_deliverer_zone?: {
@@ -325,7 +326,9 @@ export default function Dashboard() {
                   </thead>
                   <tbody className="divide-y divide-[#B08968]/10">
                     {filteredDeliveries.map((delivery) => {
-                      const statusInfo = getStatusInfo(delivery.status)
+                      const statusInfo = delivery.mobile_deliverer?.mobile_deliverer_id
+                        ? getStatusInfo("confirmed")
+                        : getStatusInfo(delivery.status)
                       
                       return (
                         <tr key={delivery._id} className="hover:bg-[#f8fafc] transition-colors">
@@ -395,7 +398,9 @@ export default function Dashboard() {
               {/* Mobile Card View */}
               <div className="lg:hidden divide-y divide-[#B08968]/10">
                 {filteredDeliveries.map((delivery) => {
-                  const statusInfo = getStatusInfo(delivery.status)
+                  const statusInfo = delivery.mobile_deliverer?.mobile_deliverer_id
+                    ? getStatusInfo("confirmed")
+                    : getStatusInfo(delivery.status)
                   
                   return (
                     <div key={delivery._id} className="p-4 space-y-3">
