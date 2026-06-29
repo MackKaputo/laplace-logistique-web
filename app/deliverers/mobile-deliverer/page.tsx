@@ -98,42 +98,11 @@ function MobileDelivererPage() {
   const [accessCode, setAccessCode] = useState("")
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [profile, setProfile] = useState<MobileDelivererProfile | null>(null)
-  const [activeTab, setActiveTab] = useState("commandes")
   const [assignedTab, setAssignedTab] = useState("en-cours")
   const [deliveringPreDeliveryId, setDeliveringPreDeliveryId] = useState<string | null>(null)
   const [failingPreDeliveryId, setFailingPreDeliveryId] = useState<string | null>(null)
   const [failureNotes, setFailureNotes] = useState<Record<string, string>>({})
   const [deliveryToConfirm, setDeliveryToConfirm] = useState<PreDelivery | null>(null)
-
-  const handleTakePreDelivery = async (preDelivery: PreDelivery) => {
-    if (!profile?.mobile_deliverer_id) return
-    
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_SERVER_BASE_URL}/deliveries/pre-deliveries/assign-mobile-deliverer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pre_delivery_id: preDelivery.pre_delivery_id,
-          mobile_deliverer_id: profile.mobile_deliverer_id,
-        }),
-      })
-      
-      if (response.ok) {
-        toast({ title: "Commande acceptée", description: `La commande de ${preDelivery.recipient_name} a été acceptée` })
-        preDeliveriesQuery.refetch()
-        assignedPreDeliveriesQuery.refetch()
-      } else {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || "Erreur lors de l'acceptation de la commande")
-      }
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Échec de l'acceptation",
-        variant: "destructive",
-      })
-    }
-  }
 
   const handleSignalDelivered = async (preDelivery: PreDelivery) => {
     setDeliveringPreDeliveryId(preDelivery.pre_delivery_id)
@@ -204,7 +173,6 @@ function MobileDelivererPage() {
         description: `${preDelivery.recipient_name || preDelivery.pre_delivery_id} a été marqué comme échec de livraison`,
       })
       assignedPreDeliveriesQuery.refetch()
-      preDeliveriesQuery.refetch()
       setFailingPreDeliveryId(null)
     } catch (error) {
       toast({
@@ -226,22 +194,6 @@ function MobileDelivererPage() {
     }
   }
 
-  const preDeliveriesQuery = useQuery<PreDelivery[]>({
-    queryKey: ["mobile-deliverer-pre-deliveries", profile?.mobile_deliverer_id],
-    queryFn: async () => {
-      if (!profile?.mobile_deliverer_id) return []
-      console.log("Fetching pre-deliveries for:", profile.mobile_deliverer_id)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_SERVER_BASE_URL}/deliveries/pre-deliveries/mobile-deliverer?mobile_deliverer_id=${profile.mobile_deliverer_id}`)
-      console.log("Response status:", response.status)
-      if (!response.ok) throw new Error("Failed to fetch pre-deliveries")
-      const result = await response.json()
-      console.log("Fetched result:", result)
-      return result.data || []
-    },
-    enabled: !!profile?.mobile_deliverer_id,
-    refetchInterval: 15000, // Auto-refresh every 15 seconds
-  })
-
   const assignedPreDeliveriesQuery = useQuery<PreDelivery[]>({
     queryKey: ["mobile-deliverer-assigned-pre-deliveries", profile?.mobile_deliverer_id],
     queryFn: async () => {
@@ -258,7 +210,6 @@ function MobileDelivererPage() {
   })
 
   const refetchPreDeliveries = () => {
-    preDeliveriesQuery.refetch()
     assignedPreDeliveriesQuery.refetch()
   }
 
@@ -461,13 +412,6 @@ function MobileDelivererPage() {
     )
   }
 
-  console.log("Query state:", {
-    isLoading: preDeliveriesQuery.isLoading,
-    data: preDeliveriesQuery.data,
-    dataLength: preDeliveriesQuery.data?.length,
-    error: preDeliveriesQuery.error
-  })
-
   const handleLogin = async () => {
     if (!accessCode.trim()) {
       toast({ title: "Code requis", description: "Veuillez saisir un code d'accès", variant: "destructive" })
@@ -520,204 +464,110 @@ function MobileDelivererPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] pt-24">
         <div className="mx-auto w-full max-w-7xl px-3 pb-28 pt-4 sm:px-4 sm:pb-10 lg:px-8 lg:py-8 space-y-4 sm:space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-3xl font-bold text-[#1a1009] mb-2">Livreur Mobile</h1>
-            <p className="text-[#B08968]">
-              {profile.first_name} {profile.last_name}
-            </p>
-          </div>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <Button 
-              variant="outline" 
-              className="flex-1 sm:w-auto" 
-              onClick={refetchPreDeliveries}
-              disabled={preDeliveriesQuery.isFetching || assignedPreDeliveriesQuery.isFetching}
-            >
-              <RefreshCw className="h-4 w-4 mr-2 shrink-0" />
-              Actualiser
-            </Button>
-            <Button variant="outline" className="w-full sm:w-auto" onClick={logout}>
-              <LogOut className="h-4 w-4 mr-2 shrink-0" />
-              Déconnexion
-            </Button>
-          </div>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-2 gap-2 rounded-xl border border-[#B08968]/20 bg-white p-1">
-            <TabsTrigger
-              value="commandes"
-              className="rounded-lg px-3 py-2 text-sm font-semibold text-[#1a1009] transition data-[state=active]:bg-[#22D3EE] data-[state=active]:text-white data-[state=active]:shadow-md"
-            >
-              Commandes ({preDeliveriesQuery.data?.length || 0})
-            </TabsTrigger>
-            <TabsTrigger
-              value="mes-commandes"
-              className="rounded-lg px-3 py-2 text-sm font-semibold text-[#1a1009] transition data-[state=active]:bg-[#22D3EE] data-[state=active]:text-white data-[state=active]:shadow-md"
-            >
-              Mes commandes ({activeAssignedPreDeliveries.length})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="commandes" className="space-y-4 sm:space-y-6">
-            <Card className="overflow-hidden border-border/80 shadow-sm">
-              <CardHeader>
-                <CardTitle>Commandes disponibles</CardTitle>
-                <CardDescription>
-                  Pré-livraisons disponibles pour votre zone
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                {preDeliveriesQuery.isLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2B015F]" />
-                  </div>
-                ) : preDeliveriesQuery.data && preDeliveriesQuery.data.length > 0 ? (
-                  <div className="space-y-3 px-3 pb-4 pt-2 sm:px-4 sm:pb-6">
-                    {preDeliveriesQuery.data.map((preDelivery) => (
-                      <Card key={preDelivery.pre_delivery_id} className="shadow-sm">
-                        <CardContent className="p-4">
-                          <div className="space-y-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1">
-                                <h3 className="font-semibold">{preDelivery.recipient_name}</h3>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-semibold">{preDelivery.package_value_amount} {preDelivery.package_value_currency}</p>
-                              </div>
-                            </div>
-                            {preDelivery.preferred_delivery_date && (
-                              <div className="mt-2 flex items-center gap-2 text-xs font-medium text-[#4338CA]">
-                                <Calendar className="h-4 w-4 shrink-0" aria-hidden />
-                                <span>
-                                  Préférence: {formatPreferredDeliveryDate(preDelivery.preferred_delivery_date)}
-                                </span>
-                              </div>
-                            )}
-                            {/* Address - Moved above product */}
-                            <div className="bg-gradient-to-r from-[#22D3EE]/10 to-[#06b6d4]/10 rounded-xl p-3 border border-[#22D3EE]/30">
-                              <div className="flex items-start gap-2">
-                                <MapPin className="h-4 w-4 text-[#22D3EE] shrink-0 mt-0.5" aria-hidden />
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-xs font-medium text-[#1a1009] mb-1">📍 Adresse de livraison</p>
-                                  <p className="text-sm text-[#1a1009] font-medium leading-snug break-words">
-                                    {preDelivery.recipient_address_line}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                            {/* Product - Now below address */}
-                            <p className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                              {preDelivery.package_description || "Aucune description fournie"}
-                            </p>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleTakePreDelivery(preDelivery)}
-                              className="w-full bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE] font-semibold shadow-lg hover:shadow-xl transition-all duration-300 border-0 mt-3"
-                            >
-                              Prendre
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
-                    <Package className="h-10 w-10 text-muted-foreground/35" aria-hidden />
-                    <p className="text-sm font-medium text-muted-foreground">Aucune commande disponible</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="mes-commandes" className="space-y-4 sm:space-y-6">
-            <Card className="overflow-hidden border-border/80 shadow-sm">
-              <CardHeader>
-                <CardTitle>Mes commandes</CardTitle>
-                <CardDescription>
-                  Commandes que vous avez acceptées
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                {assignedPreDeliveriesQuery.isLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2B015F]" />
-                  </div>
-                ) : (
-                  <Tabs value={assignedTab} onValueChange={setAssignedTab} className="space-y-3">
-                    <div className="px-3 pt-3 sm:px-4">
-                      <TabsList className="grid w-full grid-cols-2 gap-2 rounded-lg border border-[#B08968]/20 bg-white p-1">
-                        <TabsTrigger
-                          value="en-cours"
-                          className="rounded-md px-2 py-1.5 text-xs font-medium text-[#1a1009] transition data-[state=active]:bg-[#22D3EE] data-[state=active]:text-white data-[state=active]:shadow-sm"
-                        >
-                          En cours ({activeAssignedPreDeliveries.length})
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="livrees"
-                          className="rounded-md px-2 py-1.5 text-xs font-medium text-[#1a1009] transition data-[state=active]:bg-[#22D3EE] data-[state=active]:text-white data-[state=active]:shadow-sm"
-                        >
-                          Livrées ({deliveredAssignedPreDeliveries.length})
-                        </TabsTrigger>
-                      </TabsList>
-                    </div>
-                    <TabsContent value="en-cours" className="m-0">
-                      {renderAssignedPreDeliveries(activeAssignedPreDeliveries, "Aucune commande en cours")}
-                    </TabsContent>
-                    <TabsContent value="livrees" className="m-0">
-                      {renderAssignedPreDeliveries(deliveredAssignedPreDeliveries, "Aucune commande livrée")}
-                    </TabsContent>
-                  </Tabs>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-        <Dialog open={!!deliveryToConfirm} onOpenChange={(open) => { if (!open) setDeliveryToConfirm(null) }}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Confirmer la livraison</DialogTitle>
-              <DialogDescription>
-                Vous êtes sur le point de marquer la commande comme livrée. Cette action ne peut pas être annulée.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 text-sm text-muted-foreground">
-              <p>
-                Destinataire: <span className="font-semibold text-foreground">{deliveryToConfirm?.recipient_name || "—"}</span>
-              </p>
-              <p>
-                Adresse: <span className="font-semibold text-foreground">{deliveryToConfirm?.recipient_address_line || "—"}</span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-3xl font-bold text-[#1a1009] mb-2">Mes Commandes</h1>
+              <p className="text-[#B08968]">
+                {profile.first_name} {profile.last_name}
               </p>
             </div>
-            <DialogFooter className="mt-4">
+            <div className="flex gap-2 w-full sm:w-auto">
               <Button
-                type="button"
                 variant="outline"
-                onClick={() => setDeliveryToConfirm(null)}
-                className="w-full sm:w-auto"
+                className="flex-1 sm:w-auto"
+                onClick={refetchPreDeliveries}
+                disabled={assignedPreDeliveriesQuery.isFetching}
               >
-                Annuler
+                <RefreshCw className="h-4 w-4 mr-2 shrink-0" />
+                Actualiser
               </Button>
-              <Button
-                type="button"
-                className="w-full sm:w-auto bg-green-700 text-white hover:bg-green-800"
-                onClick={confirmSignalDelivered}
-                disabled={deliveryToConfirm?.pre_delivery_id === deliveringPreDeliveryId}
-              >
-                {deliveryToConfirm?.pre_delivery_id === deliveringPreDeliveryId ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                {deliveryToConfirm?.pre_delivery_id === deliveringPreDeliveryId ? "Signalement..." : "Confirmer"}
+              <Button variant="outline" className="w-full sm:w-auto" onClick={logout}>
+                <LogOut className="h-4 w-4 mr-2 shrink-0" />
+                Déconnexion
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </div>
+          </div>
+
+          <Card className="overflow-hidden border-border/80 shadow-sm">
+            <CardHeader>
+              <CardTitle>Mes commandes</CardTitle>
+              <CardDescription>Commandes qui vous ont été assignées</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {assignedPreDeliveriesQuery.isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#22D3EE]" />
+                </div>
+              ) : (
+                <Tabs value={assignedTab} onValueChange={setAssignedTab} className="space-y-3">
+                  <div className="px-3 pt-3 sm:px-4">
+                    <TabsList className="grid w-full grid-cols-2 gap-2 rounded-lg border border-[#B08968]/20 bg-white p-1">
+                      <TabsTrigger
+                        value="en-cours"
+                        className="rounded-md px-2 py-1.5 text-xs font-medium text-[#1a1009] transition data-[state=active]:bg-[#22D3EE] data-[state=active]:text-white data-[state=active]:shadow-sm"
+                      >
+                        En cours ({activeAssignedPreDeliveries.length})
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="livrees"
+                        className="rounded-md px-2 py-1.5 text-xs font-medium text-[#1a1009] transition data-[state=active]:bg-[#22D3EE] data-[state=active]:text-white data-[state=active]:shadow-sm"
+                      >
+                        Livrées ({deliveredAssignedPreDeliveries.length})
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
+                  <TabsContent value="en-cours" className="m-0">
+                    {renderAssignedPreDeliveries(activeAssignedPreDeliveries, "Aucune commande en cours")}
+                  </TabsContent>
+                  <TabsContent value="livrees" className="m-0">
+                    {renderAssignedPreDeliveries(deliveredAssignedPreDeliveries, "Aucune commande livrée")}
+                  </TabsContent>
+                </Tabs>
+              )}
+            </CardContent>
+          </Card>
+
+          <Dialog open={!!deliveryToConfirm} onOpenChange={(open) => { if (!open) setDeliveryToConfirm(null) }}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Confirmer la livraison</DialogTitle>
+                <DialogDescription>
+                  Vous êtes sur le point de marquer la commande comme livrée. Cette action ne peut pas être annulée.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 text-sm text-muted-foreground">
+                <p>
+                  Destinataire: <span className="font-semibold text-foreground">{deliveryToConfirm?.recipient_name || "—"}</span>
+                </p>
+                <p>
+                  Adresse: <span className="font-semibold text-foreground">{deliveryToConfirm?.recipient_address_line || "—"}</span>
+                </p>
+              </div>
+              <DialogFooter className="mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDeliveryToConfirm(null)}
+                  className="w-full sm:w-auto"
+                >
+                  Annuler
+                </Button>
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto bg-green-700 text-white hover:bg-green-800"
+                  onClick={confirmSignalDelivered}
+                  disabled={deliveryToConfirm?.pre_delivery_id === deliveringPreDeliveryId}
+                >
+                  {deliveryToConfirm?.pre_delivery_id === deliveringPreDeliveryId ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  {deliveryToConfirm?.pre_delivery_id === deliveringPreDeliveryId ? "Signalement..." : "Confirmer"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     )

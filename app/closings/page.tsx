@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { format } from "date-fns"
 import {
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -20,7 +21,9 @@ import {
   PhoneCall,
   RefreshCw,
   Search,
+  Truck,
   User,
+  UserCheck,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -60,6 +63,16 @@ interface CloserProfile {
   customers: CloserCustomer[]
 }
 
+interface MobileDeliverer {
+  _id: string
+  mobile_deliverer_id: string
+  first_name: string
+  last_name: string
+  phone_number: string
+  access_code: string
+  mobile_deliverer_zones: string[]
+}
+
 interface PreDelivery {
   pre_delivery_id: string
   created_at?: string
@@ -74,6 +87,11 @@ interface PreDelivery {
   is_delivery_price_included: boolean
   customer_id: string
   status?: string
+  preferred_delivery_date?: number | string
+  mobile_deliverer?: {
+    mobile_deliverer_id: string
+    name: string
+  }
 }
 
 interface Commune {
@@ -227,6 +245,13 @@ function ClosingsContent() {
   const [isUpdatingDelivery, setIsUpdatingDelivery] = useState(false)
   const [isRefreshingDeliveries, setIsRefreshingDeliveries] = useState(false)
   const [expandedPreDeliveryId, setExpandedPreDeliveryId] = useState<string | null>(null)
+
+  // Assigner tab state
+  const [mobileDeliverers, setMobileDeliverers] = useState<MobileDeliverer[]>([])
+  const [loadingDeliverers, setLoadingDeliverers] = useState(false)
+  const [assigningPreDeliveryId, setAssigningPreDeliveryId] = useState<string | null>(null)
+  const [selectedDelivererId, setSelectedDelivererId] = useState<Record<string, string>>({})
+  const [assignerSearchQuery, setAssignerSearchQuery] = useState("")
   const [editPackageValue, setEditPackageValue] = useState("")
   const [editAddress, setEditAddress] = useState("")
   const [editNote, setEditNote] = useState("")
@@ -361,6 +386,88 @@ function ClosingsContent() {
       fetchMobileDelivererZones()
     }
   }, [apiBaseUrl])
+
+  const plannedForTodayQuery = useQuery({
+    queryKey: ["planned-for-today"],
+    queryFn: async () => {
+      const response = await fetch(`${apiBaseUrl}/deliveries/pre-deliveries/planned-for-today`)
+      if (!response.ok) throw new Error("Erreur lors du chargement")
+      const result = await response.json()
+      return (result.data || []) as PreDelivery[]
+    },
+    enabled: !!apiBaseUrl && !!profile && activeTab === "deliveries",
+    refetchInterval: 60000,
+  })
+
+  const unassignedConfirmedQuery = useQuery({
+    queryKey: ["unassigned-confirmed-today", selectedCustomerId],
+    queryFn: async () => {
+      const response = await fetch(`${apiBaseUrl}/deliveries/pre-deliveries/unassigned-confirmed-for-today`)
+      if (!response.ok) throw new Error("Erreur lors du chargement")
+      const result = await response.json()
+      return (result.data || []) as PreDelivery[]
+    },
+    enabled: !!apiBaseUrl && !!profile && activeTab === "assigner",
+  })
+
+  // Re-fetch unassigned confirmed when switching to Assigner tab
+  useEffect(() => {
+    if (activeTab === "assigner") {
+      unassignedConfirmedQuery.refetch()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  // Fetch mobile deliverers when Assigner tab is active
+  useEffect(() => {
+    if (activeTab !== "assigner" || !apiBaseUrl) return
+    const fetchDeliverers = async () => {
+      setLoadingDeliverers(true)
+      try {
+        const response = await fetch(`${apiBaseUrl}/deliverers/mobile-deliverers`)
+        if (response.ok) {
+          const result = await response.json()
+          setMobileDeliverers(result.data || [])
+        }
+      } catch {
+        // silently fail
+      } finally {
+        setLoadingDeliverers(false)
+      }
+    }
+    fetchDeliverers()
+  }, [activeTab, apiBaseUrl])
+
+  const handleAssignDeliverer = async (preDelivery: PreDelivery) => {
+    const delivererId = selectedDelivererId[preDelivery.pre_delivery_id]
+    if (!delivererId || !apiBaseUrl) return
+    setAssigningPreDeliveryId(preDelivery.pre_delivery_id)
+    try {
+      const response = await fetch(`${apiBaseUrl}/deliveries/pre-deliveries/assign-mobile-deliverer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pre_delivery_id: preDelivery.pre_delivery_id,
+          mobile_deliverer_id: delivererId,
+        }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Erreur lors de l'assignation")
+      }
+      toast({ title: "Livreur assigné", description: `Commande de ${preDelivery.recipient_name} assignée avec succès` })
+      setSelectedDelivererId((prev) => { const next = { ...prev }; delete next[preDelivery.pre_delivery_id]; return next })
+      unassignedConfirmedQuery.refetch()
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Échec de l'assignation",
+        variant: "destructive",
+      })
+    } finally {
+      setAssigningPreDeliveryId(null)
+    }
+  }
 
   const handleQuickStatusUpdate = useCallback(
     async (preDelivery: PreDelivery, newStatus: string) => {
@@ -560,6 +667,7 @@ function ClosingsContent() {
         setEditPackageValue("")
         setEditNote("")
         preDeliveriesQuery.refetch()
+        unassignedConfirmedQuery.refetch()
       } else {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.message || "Erreur lors de l'assignation de zone")
@@ -897,9 +1005,12 @@ function ClosingsContent() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-3 sm:space-y-4">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 sm:max-w-md">
+        <TabsList className="grid h-auto w-full grid-cols-3 gap-1 p-1">
           <TabsTrigger value="pre-deliveries" className="text-xs py-2.5 sm:text-sm shrink-0">
             Pré-livraisons
+          </TabsTrigger>
+          <TabsTrigger value="assigner" className="text-xs py-2.5 sm:text-sm shrink-0">
+            Assigner
           </TabsTrigger>
           <TabsTrigger value="deliveries" className="text-xs py-2.5 sm:text-sm shrink-0">
             Livraisons
@@ -1281,55 +1392,288 @@ function ClosingsContent() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="assigner" className="space-y-4 sm:space-y-6">
+          <Card className="overflow-hidden border-border/80 shadow-sm">
+            <CardHeader className="space-y-3 pb-4 px-3 sm:px-6 pt-4 sm:pt-6">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <UserCheck className="h-5 w-5 text-[#22D3EE]" />
+                Assigner un livreur
+              </CardTitle>
+              <CardDescription>Choisissez un livreur pour chaque commande confirmée.</CardDescription>
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  value={assignerSearchQuery}
+                  onChange={(e) => setAssignerSearchQuery(e.target.value)}
+                  className="pl-9 h-11"
+                  placeholder="Rechercher (nom, tél., adresse...)"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {unassignedConfirmedQuery.isLoading || unassignedConfirmedQuery.isFetching || loadingDeliverers ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#22D3EE]" />
+                </div>
+              ) : (() => {
+                const confirmedOrders = (unassignedConfirmedQuery.data || []).filter((pd) => {
+                  const matchesSearch = !assignerSearchQuery.trim() || [
+                    pd.recipient_name,
+                    pd.recipient_phone_number,
+                    pd.recipient_address_line,
+                    pd.package_description,
+                  ].join(" ").toLowerCase().includes(assignerSearchQuery.toLowerCase())
+                  return matchesSearch
+                })
+                if (confirmedOrders.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
+                      <Truck className="h-10 w-10 text-muted-foreground/35" aria-hidden />
+                      <p className="text-sm font-medium text-muted-foreground">Aucune commande à assigner</p>
+                    </div>
+                  )
+                }
+                return (
+                  <div className="space-y-3 px-3 pb-4 pt-2 sm:px-4">
+                    {confirmedOrders.map((pd) => {
+                      const isAssigning = assigningPreDeliveryId === pd.pre_delivery_id
+                      const chosenDelivererId = selectedDelivererId[pd.pre_delivery_id] || ""
+                      return (
+                        <div key={pd.pre_delivery_id} className="rounded-xl border bg-white shadow-sm overflow-hidden">
+                          {/* Order info */}
+                          <div className="p-4 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-[#1a1009] leading-tight">{pd.recipient_name || "Non spécifié"}</p>
+                                <p className="text-xs text-[#B08968] mt-0.5">{pd.package_description}</p>
+                              </div>
+                              <span className="shrink-0 text-xs font-semibold tabular-nums text-[#1a1009]">
+                                {pd.package_value_amount} {pd.package_value_currency}
+                              </span>
+                            </div>
+                            <div className="flex items-start gap-2 bg-[#22D3EE]/5 rounded-lg p-2 border border-[#22D3EE]/20">
+                              <MapPin className="h-3.5 w-3.5 text-[#22D3EE] shrink-0 mt-0.5" />
+                              <p className="text-xs text-[#1a1009] leading-snug break-words">{pd.recipient_address_line}</p>
+                            </div>
+                            {pd.recipient_phone_number && (
+                              <a
+                                href={getPhoneHref(pd.recipient_phone_number) || undefined}
+                                className="inline-flex items-center gap-1.5 text-xs text-[#2563eb] font-medium"
+                              >
+                                <Phone className="h-3 w-3 shrink-0" />
+                                {pd.recipient_phone_number}
+                              </a>
+                            )}
+                          </div>
+                          {/* Deliverer selector */}
+                          <div className="border-t border-[#B08968]/10 bg-[#f8fafc] px-4 py-3 space-y-2">
+                            <p className="text-xs font-semibold text-[#B08968] uppercase tracking-wide">Assigner à</p>
+                            <Select
+                              value={chosenDelivererId}
+                              onValueChange={(value) =>
+                                setSelectedDelivererId((prev) => ({ ...prev, [pd.pre_delivery_id]: value }))
+                              }
+                              disabled={isAssigning}
+                            >
+                              <SelectTrigger className="h-11 w-full">
+                                <SelectValue placeholder="Sélectionner un livreur..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {mobileDeliverers.map((deliverer) => (
+                                  <SelectItem key={deliverer.mobile_deliverer_id} value={deliverer.mobile_deliverer_id}>
+                                    {deliverer.first_name} {deliverer.last_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              type="button"
+                              className="h-10 w-full bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE] font-semibold border-0"
+                              disabled={!chosenDelivererId || isAssigning}
+                              onClick={() => handleAssignDeliverer(pd)}
+                            >
+                              {isAssigning ? (
+                                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Assignation...</>
+                              ) : (
+                                <><UserCheck className="h-4 w-4 mr-2" />Assigner</>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="deliveries" className="space-y-4 sm:space-y-6">
           <Card className="overflow-hidden border-border/80 shadow-sm">
-            <CardHeader className="space-y-3 px-3 pb-2 pt-4 sm:px-6 sm:pt-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <CardTitle className="text-lg sm:text-xl">Livraisons</CardTitle>
+            <CardHeader className="space-y-3 pb-4 px-3 sm:px-6 pt-4 sm:pt-6">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <Clock className="h-5 w-5 text-[#22D3EE]" />
+                  Livraisons planifiées aujourd'hui
+                </CardTitle>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleRefreshDeliveries}
-                  disabled={isRefreshingDeliveries}
-                  className="flex h-10 w-full shrink-0 items-center justify-center gap-2 bg-transparent sm:h-9 sm:w-auto"
+                  onClick={() => plannedForTodayQuery.refetch()}
+                  disabled={plannedForTodayQuery.isFetching}
+                  className="h-9 w-auto shrink-0"
                   type="button"
                 >
-                  <RefreshCw className={`h-4 w-4 shrink-0 ${isRefreshingDeliveries ? "animate-spin" : ""}`} />
-                  Actualiser
+                  <RefreshCw className={`h-4 w-4 shrink-0 ${plannedForTodayQuery.isFetching ? "animate-spin" : ""}`} />
                 </Button>
               </div>
+              {(() => {
+                const now = Date.now()
+                const overdue = (plannedForTodayQuery.data || []).filter((pd) => pd.preferred_delivery_date && Number(pd.preferred_delivery_date) < now)
+                const soon = (plannedForTodayQuery.data || []).filter((pd) => {
+                  const t = Number(pd.preferred_delivery_date)
+                  return pd.preferred_delivery_date && t >= now && t - now <= 60 * 60 * 1000
+                })
+                if (overdue.length === 0 && soon.length === 0) return null
+                return (
+                  <div className="flex flex-wrap gap-2">
+                    {overdue.length > 0 && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-300">
+                        <AlertTriangle className="h-3 w-3" />
+                        {overdue.length} en retard
+                      </span>
+                    )}
+                    {soon.length > 0 && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700 ring-1 ring-orange-300">
+                        <Clock className="h-3 w-3" />
+                        {soon.length} dans moins d'1h
+                      </span>
+                    )}
+                  </div>
+                )
+              })()}
             </CardHeader>
-            <CardContent className="overflow-x-hidden px-3 pb-4 sm:px-6 lg:overflow-visible">
-              <FilterControls
-                searchQuery={deliverySearchQuery}
-                setSearchQuery={setDeliverySearchQuery}
-                statusFilter={deliveryStatusFilter}
-                setStatusFilter={setDeliveryStatusFilter}
-                date={deliveryDate}
-                setDate={setDeliveryDate}
-                searchPlaceholder="Rechercher par code, adresse, destinataire..."
-                statusOptions={[
-                  { value: "tous", label: "Tous les statuts" },
-                  { value: "unassigned", label: "En attente" },
-                  { value: "assigned", label: "Assignée" },
-                  { value: "delivery_start_to_pickup", label: "En route ramassage" },
-                  { value: "picked", label: "Ramassée" },
-                  { value: "delivery_start_to_recipient", label: "En route livraison" },
-                  { value: "arrived_to_recipient", label: "Arrivée destinataire" },
-                  { value: "unreachable_recipient", label: "Destinataire injoignable" },
-                  { value: "refused", label: "Refusée" },
-                  { value: "delivered", label: "Livrée" },
-                  { value: "cancelled", label: "Annulée" },
-                ]}
-              />
-              <DeliveryTable
-                deliveries={filteredDeliveries}
-                expandable={true}
-                preferStackedMobileCards
-                onEditDelivery={handleUpdateDelivery}
-                onCancelDelivery={handleCancelDelivery}
-                isUpdating={isUpdatingDelivery || deliveriesQuery.isFetching}
-              />
+            <CardContent className="p-0">
+              {plannedForTodayQuery.isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#22D3EE]" />
+                </div>
+              ) : (plannedForTodayQuery.data || []).length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
+                  <Clock className="h-10 w-10 text-muted-foreground/35" aria-hidden />
+                  <p className="text-sm font-medium text-muted-foreground">Aucune livraison planifiée pour aujourd'hui</p>
+                </div>
+              ) : (
+                <div className="space-y-3 px-3 pb-4 pt-2 sm:px-4">
+                  {(plannedForTodayQuery.data || [])
+                    .slice()
+                    .sort((a, b) => Number(a.preferred_delivery_date || 0) - Number(b.preferred_delivery_date || 0))
+                    .map((pd) => {
+                      const now = Date.now()
+                      const deliveryTime = pd.preferred_delivery_date ? Number(pd.preferred_delivery_date) : null
+                      const isOverdue = deliveryTime !== null && deliveryTime < now
+                      const isSoon = deliveryTime !== null && !isOverdue && deliveryTime - now <= 60 * 60 * 1000
+                      const timeLabel = deliveryTime
+                        ? new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(new Date(deliveryTime))
+                        : null
+                      const dateLabel = deliveryTime
+                        ? new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "2-digit", month: "short" }).format(new Date(deliveryTime))
+                        : null
+                      const phoneHref = getPhoneHref(pd.recipient_phone_number)
+                      const whatsappHref = getWhatsappHref(pd.recipient_phone_number)
+
+                      return (
+                        <div
+                          key={pd.pre_delivery_id}
+                          className={`rounded-xl border shadow-sm overflow-hidden transition-all ${
+                            isOverdue
+                              ? "border-red-400 bg-red-50 ring-2 ring-red-300 animate-pulse-slow"
+                              : isSoon
+                              ? "border-orange-300 bg-orange-50 ring-1 ring-orange-200"
+                              : "border-[#B08968]/15 bg-white"
+                          }`}
+                        >
+                          {/* Time banner */}
+                          <div className={`flex items-center justify-between gap-3 px-4 py-2 ${
+                            isOverdue ? "bg-red-500" : isSoon ? "bg-orange-400" : "bg-[#1a1009]"
+                          }`}>
+                            <div className="flex items-center gap-2">
+                              {isOverdue ? (
+                                <AlertTriangle className="h-4 w-4 text-white shrink-0" />
+                              ) : (
+                                <Clock className="h-4 w-4 text-white shrink-0" />
+                              )}
+                              {timeLabel ? (
+                                <span className="text-white font-bold text-sm tracking-wide">{timeLabel}</span>
+                              ) : (
+                                <span className="text-white/60 text-xs">Heure non renseignée</span>
+                              )}
+                              {dateLabel && <span className="text-white/70 text-xs capitalize">{dateLabel}</span>}
+                            </div>
+                            {isOverdue && (
+                              <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wide">En retard</span>
+                            )}
+                            {isSoon && (
+                              <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wide">Bientôt</span>
+                            )}
+                          </div>
+
+                          {/* Content */}
+                          <div className="p-4 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className={`text-sm font-semibold leading-tight ${
+                                  isOverdue ? "text-red-900" : "text-[#1a1009]"
+                                }`}>{pd.recipient_name || "Non spécifié"}</p>
+                                <p className="text-xs text-[#B08968] mt-0.5">{pd.package_description}</p>
+                                {pd.mobile_deliverer?.name && (
+                                  <p className="text-xs font-medium text-[#22D3EE] mt-0.5 flex items-center gap-1">
+                                    <User className="h-3 w-3 shrink-0" />
+                                    {pd.mobile_deliverer.name}
+                                  </p>
+                                )}
+                              </div>
+                              <span className="shrink-0 text-xs font-semibold tabular-nums text-[#1a1009]">
+                                {pd.package_value_amount} {pd.package_value_currency}
+                              </span>
+                            </div>
+                            <div className={`flex items-start gap-2 rounded-lg p-2 border ${
+                              isOverdue ? "bg-red-100/60 border-red-200" : "bg-[#22D3EE]/5 border-[#22D3EE]/20"
+                            }`}>
+                              <MapPin className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${
+                                isOverdue ? "text-red-500" : "text-[#22D3EE]"
+                              }`} />
+                              <p className="text-xs text-[#1a1009] leading-snug break-words">{pd.recipient_address_line}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {phoneHref && (
+                                <Button asChild size="sm" className={`h-8 flex-1 sm:flex-none text-xs font-semibold border-0 ${
+                                  isOverdue
+                                    ? "bg-red-600 hover:bg-red-700 text-white"
+                                    : "bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE]"
+                                }`}>
+                                  <a href={phoneHref}>
+                                    <Phone className="h-3 w-3 mr-1" />
+                                    Appeler
+                                  </a>
+                                </Button>
+                              )}
+                              {whatsappHref && (
+                                <Button asChild size="sm" variant="outline" className="h-8 flex-1 sm:flex-none border-green-600 text-green-700 hover:bg-green-50 text-xs font-semibold">
+                                  <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+                                    <MessageCircle className="h-3 w-3 mr-1" />
+                                    WhatsApp
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
