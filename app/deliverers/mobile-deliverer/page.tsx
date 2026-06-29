@@ -126,7 +126,7 @@ function MobileDelivererPage() {
         description: `${preDelivery.recipient_name || preDelivery.pre_delivery_id} a été marqué comme livré`,
       })
       assignedPreDeliveriesQuery.refetch()
-      preDeliveriesQuery.refetch()
+      // preDeliveriesQuery.refetch()
       setFailingPreDeliveryId(null)
       return true
     } catch (error) {
