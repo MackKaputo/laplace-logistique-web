@@ -237,8 +237,10 @@ function ClosingsContent() {
   const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(undefined)
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<string>("tous")
   const [deliverySearchQuery, setDeliverySearchQuery] = useState<string>("")
-  const [deliveryPage, setDeliveryPage] = useState(1)
-  const [deliveryPageSize] = useState(60)
+
+  const [preDeliveryPage, setPreDeliveryPage] = useState(1)
+  const [preDeliveryPageSize] = useState(60)
+  const [preDeliveryTotal, setPreDeliveryTotal] = useState(0)
 
   const [communes, setCommunes] = useState<Commune[]>([])
   const [availableQuartiers, setAvailableQuartiers] = useState<Quartier[]>([])
@@ -297,15 +299,23 @@ function ClosingsContent() {
   }, [selectedCommuneId, communes])
 
   const preDeliveriesQuery = useQuery({
-    queryKey: ["closings-pre-deliveries", selectedCustomerId],
+    queryKey: ["closings-pre-deliveries", selectedCustomerId, profile?.user_id, preDeliveryPage, preDeliveryPageSize],
     queryFn: async () => {
-      const response = await fetch(`${apiBaseUrl}/deliveries/pre-deliveries/closer?customer_id=${selectedCustomerId}`)
+      const response = await fetch(
+        `${apiBaseUrl}/deliveries/pre-deliveries/closer?customer_id=${selectedCustomerId}&user_id=${profile?.user_id}&page=${preDeliveryPage}&limit=${preDeliveryPageSize}`,
+      )
       if (!response.ok) throw new Error("Erreur lors du chargement des pré-livraisons")
       const result = await response.json()
+      setPreDeliveryTotal(result.total ?? result.count ?? result.data?.length ?? 0)
       return (result.data || []) as PreDelivery[]
     },
     enabled: !!apiBaseUrl && !!selectedCustomerId && !!profile,
   })
+
+  // Reset to page 1 when the customer changes
+  useEffect(() => {
+    setPreDeliveryPage(1)
+  }, [selectedCustomerId])
 
   const deliveriesQuery = useQuery({
     queryKey: ["closings-deliveries", selectedCustomerId],
@@ -776,13 +786,9 @@ function ClosingsContent() {
     })
   }, [preDeliveriesQuery.data, searchQuery, selectedCustomerName, statusFilter])
 
-  const paginatedPreDeliveries = useMemo(() => {
-    const startIndex = (deliveryPage - 1) * deliveryPageSize
-    const endIndex = startIndex + deliveryPageSize
-    return filteredPreDeliveries.slice(startIndex, endIndex)
-  }, [filteredPreDeliveries, deliveryPage, deliveryPageSize])
+  const paginatedPreDeliveries = useMemo(() => filteredPreDeliveries, [filteredPreDeliveries])
 
-  const totalPages = Math.ceil(filteredPreDeliveries.length / deliveryPageSize)
+  const preDeliveryTotalPages = Math.ceil(preDeliveryTotal / preDeliveryPageSize)
 
   const filteredDeliveries = useMemo(() => {
     const rows = deliveriesQuery.data || []
@@ -1178,22 +1184,22 @@ function ClosingsContent() {
                 {/* Pagination Controls */}
                 <div className="flex items-center justify-between px-4 py-3 border-t bg-background/95">
                   <div className="text-sm text-muted-foreground">
-                    Page {deliveryPage} sur {totalPages || 1} ({filteredPreDeliveries.length} total)
+                    Page {preDeliveryPage} sur {preDeliveryTotalPages || 1} ({preDeliveryTotal} total)
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setDeliveryPage(Math.max(1, deliveryPage - 1))}
-                      disabled={deliveryPage <= 1 || preDeliveriesQuery.isFetching}
+                      onClick={() => setPreDeliveryPage(Math.max(1, preDeliveryPage - 1))}
+                      disabled={preDeliveryPage <= 1 || preDeliveriesQuery.isFetching}
                     >
                       Précédent
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setDeliveryPage(deliveryPage + 1)}
-                      disabled={preDeliveriesQuery.isFetching || deliveryPage >= totalPages}
+                      onClick={() => setPreDeliveryPage(preDeliveryPage + 1)}
+                      disabled={preDeliveriesQuery.isFetching || preDeliveryPage >= preDeliveryTotalPages}
                     >
                       Suivant
                     </Button>
