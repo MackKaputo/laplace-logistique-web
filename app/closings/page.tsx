@@ -2,7 +2,6 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query"
-import { format } from "date-fns"
 import {
   AlertCircle,
   AlertTriangle,
@@ -34,8 +33,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FilterControls } from "@/components/dashboard/filter-controls"
-import { DeliveryTable } from "@/components/dashboard/delivery-table"
 import { formatPreDeliveryCreatedAtFrench } from "@/lib/utils"
 
 type PreDeliveryStatus =
@@ -234,18 +231,12 @@ function ClosingsContent() {
   const [isSubmittingPreDelivery, setIsSubmittingPreDelivery] = useState(false)
   const [isAssigningZone, setIsAssigningZone] = useState(false)
 
-  const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(undefined)
-  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<string>("tous")
-  const [deliverySearchQuery, setDeliverySearchQuery] = useState<string>("")
-
   const [preDeliveryPage, setPreDeliveryPage] = useState(1)
   const [preDeliveryPageSize] = useState(60)
   const [preDeliveryTotal, setPreDeliveryTotal] = useState(0)
 
   const [communes, setCommunes] = useState<Commune[]>([])
   const [availableQuartiers, setAvailableQuartiers] = useState<Quartier[]>([])
-  const [isUpdatingDelivery, setIsUpdatingDelivery] = useState(false)
-  const [isRefreshingDeliveries, setIsRefreshingDeliveries] = useState(false)
   const [expandedPreDeliveryId, setExpandedPreDeliveryId] = useState<string | null>(null)
 
   // Assigner tab state
@@ -317,25 +308,12 @@ function ClosingsContent() {
     setPreDeliveryPage(1)
   }, [selectedCustomerId])
 
-  const deliveriesQuery = useQuery({
-    queryKey: ["closings-deliveries", selectedCustomerId],
-    queryFn: async () => {
-      const response = await fetch(`${apiBaseUrl}/deliveries/user-deliveries?customer_id=${selectedCustomerId}`)
-      if (!response.ok) throw new Error("Erreur lors du chargement des livraisons")
-      const result = await response.json()
-      return result.data || []
-    },
-    enabled: !!apiBaseUrl && !!selectedCustomerId && !!profile,
-  })
-
   useEffect(() => {
     if (!profile || !selectedCustomerId) return
     if (activeTab === "pre-deliveries") {
       preDeliveriesQuery.refetch()
-      return
     }
-    deliveriesQuery.refetch()
-  }, [activeTab, profile, selectedCustomerId, preDeliveriesQuery.refetch, deliveriesQuery.refetch])
+  }, [activeTab, profile, selectedCustomerId, preDeliveriesQuery.refetch])
 
   const selectedCustomerName = useMemo(() => {
     return profile?.customers.find((c) => c.customer_id === selectedCustomerId)?.name || ""
@@ -714,50 +692,6 @@ function ClosingsContent() {
     setEditNote("")
   }
 
-  const handleRefreshDeliveries = async () => {
-    setIsRefreshingDeliveries(true)
-    await deliveriesQuery.refetch()
-    setIsRefreshingDeliveries(false)
-  }
-
-  const handleUpdateDelivery = async (updateData: any) => {
-    if (!apiBaseUrl) return
-    setIsUpdatingDelivery(true)
-    try {
-      const response = await fetch(`${apiBaseUrl}/deliveries`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateData),
-      })
-      if (!response.ok) throw new Error("Échec de mise à jour")
-      toast({ title: "Livraison mise à jour" })
-      deliveriesQuery.refetch()
-    } catch {
-      toast({ title: "Erreur", description: "Impossible de mettre à jour la livraison", variant: "destructive" })
-    } finally {
-      setIsUpdatingDelivery(false)
-    }
-  }
-
-  const handleCancelDelivery = async (cancelData: any) => {
-    if (!apiBaseUrl) return
-    setIsUpdatingDelivery(true)
-    try {
-      const response = await fetch(`${apiBaseUrl}/deliveries/cancel-delivery`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(cancelData),
-      })
-      if (!response.ok) throw new Error("Échec d'annulation")
-      toast({ title: "Livraison annulée" })
-      deliveriesQuery.refetch()
-    } catch {
-      toast({ title: "Erreur", description: "Impossible d'annuler la livraison", variant: "destructive" })
-    } finally {
-      setIsUpdatingDelivery(false)
-    }
-  }
-
   const filteredPreDeliveries = useMemo(() => {
     const list = (preDeliveriesQuery.data || []) as PreDelivery[]
     return list.filter((pd) => {
@@ -789,38 +723,6 @@ function ClosingsContent() {
   const paginatedPreDeliveries = useMemo(() => filteredPreDeliveries, [filteredPreDeliveries])
 
   const preDeliveryTotalPages = Math.ceil(preDeliveryTotal / preDeliveryPageSize)
-
-  const filteredDeliveries = useMemo(() => {
-    const rows = deliveriesQuery.data || []
-    return rows.filter((delivery: any) => {
-      if (deliveryStatusFilter !== "tous" && delivery.status !== deliveryStatusFilter) return false
-
-      if (deliveryDate) {
-        const createdAt = delivery.created_at ? new Date(delivery.created_at) : null
-        if (!createdAt) return false
-        const selected = format(deliveryDate, "yyyy-MM-dd")
-        const value = format(createdAt, "yyyy-MM-dd")
-        if (selected !== value) return false
-      }
-
-      if (deliverySearchQuery.trim()) {
-        const query = deliverySearchQuery.toLowerCase()
-        const text = [
-          delivery.package_code,
-          delivery.delivery_id,
-          delivery.pickup_address?.address_line,
-          delivery.recipient?.address?.address_line,
-          delivery.recipient?.name,
-          delivery.package?.title,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-        if (!text.includes(query)) return false
-      }
-      return true
-    })
-  }, [deliveriesQuery.data, deliveryDate, deliverySearchQuery, deliveryStatusFilter])
 
   if (!profile) {
     return (
