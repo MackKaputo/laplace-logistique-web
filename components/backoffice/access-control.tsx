@@ -24,7 +24,7 @@ export function AccessControl({ children, requiredRole = "both" }: AccessControl
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2B015F]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#22D3EE]"></div>
       </div>
     )
   }

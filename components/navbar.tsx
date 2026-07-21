@@ -21,6 +21,8 @@ export default function Navbar() {
   const pathname = usePathname()
   const showDashboardLink = user && (pathname === "/" || pathname?.startsWith("/dashboard"))
 
+  if (pathname?.startsWith("/backoffice")) return null
+
   return (
     <>
       <header className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-6xl">

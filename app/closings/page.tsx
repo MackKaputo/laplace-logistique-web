@@ -205,13 +205,13 @@ const getWhatsappHref = (phoneNumber: string) => {
   return normalizedPhoneNumber ? `https://wa.me/${normalizedPhoneNumber}` : ""
 }
 
-function ClosingsContent() {
+export function ClosingsContent({ initialProfile }: { initialProfile?: CloserProfile } = {}) {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_SERVER_BASE_URL
   const { toast } = useToast()
 
   const [accessCode, setAccessCode] = useState("")
   const [isLoggingIn, setIsLoggingIn] = useState(false)
-  const [profile, setProfile] = useState<CloserProfile | null>(null)
+  const [profile, setProfile] = useState<CloserProfile | null>(initialProfile ?? null)
   const [selectedCustomerId, setSelectedCustomerId] = useState("")
   const [activeTab, setActiveTab] = useState("pre-deliveries")
 
@@ -251,6 +251,14 @@ function ClosingsContent() {
   const [isEditingPreDelivery, setIsEditingPreDelivery] = useState(false)
 
   useEffect(() => {
+    if (initialProfile) {
+      setProfile(initialProfile)
+      if (initialProfile.customers?.length > 0) {
+        setSelectedCustomerId(initialProfile.customers[0].customer_id)
+      }
+      return
+    }
+
     const stored = localStorage.getItem(SESSION_KEY)
     if (!stored) return
     try {
@@ -262,7 +270,7 @@ function ClosingsContent() {
     } catch {
       localStorage.removeItem(SESSION_KEY)
     }
-  }, [])
+  }, [initialProfile])
 
   useEffect(() => {
     const fetchCommunes = async () => {
@@ -290,10 +298,11 @@ function ClosingsContent() {
   }, [selectedCommuneId, communes])
 
   const preDeliveriesQuery = useQuery({
-    queryKey: ["closings-pre-deliveries", selectedCustomerId, profile?.user_id, preDeliveryPage, preDeliveryPageSize],
+    queryKey: ["closings-pre-deliveries", selectedCustomerId, profile?.user_id, preDeliveryPage, preDeliveryPageSize, initialProfile ? "backoffice" : null],
     queryFn: async () => {
+      const sourceParam = initialProfile ? "&source=backoffice" : ""
       const response = await fetch(
-        `${apiBaseUrl}/deliveries/pre-deliveries/closer?customer_id=${selectedCustomerId}&user_id=${profile?.user_id}&page=${preDeliveryPage}&limit=${preDeliveryPageSize}`,
+        `${apiBaseUrl}/deliveries/pre-deliveries/closer?customer_id=${selectedCustomerId}&user_id=${profile?.user_id}&page=${preDeliveryPage}&limit=${preDeliveryPageSize}${sourceParam}`,
       )
       if (!response.ok) throw new Error("Erreur lors du chargement des pré-livraisons")
       const result = await response.json()
@@ -762,7 +771,7 @@ function ClosingsContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] pt-24">
+    <div className={`min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] ${initialProfile ? "" : "pt-24"}`}>
       <div className="mx-auto w-full max-w-7xl px-3 pb-28 pt-4 sm:px-4 sm:pb-10 lg:px-8 lg:py-8 lg:pb-12 space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
@@ -790,10 +799,12 @@ function ClosingsContent() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" className="w-full shrink-0 sm:w-auto" onClick={logout}>
-            <LogOut className="h-4 w-4 mr-2 shrink-0" />
-            Déconnexion
-          </Button>
+          {!initialProfile && (
+            <Button variant="outline" className="w-full shrink-0 sm:w-auto" onClick={logout}>
+              <LogOut className="h-4 w-4 mr-2 shrink-0" />
+              Déconnexion
+            </Button>
+          )}
         </div>
       </div>
 
