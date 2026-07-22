@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, CalendarDays, CheckCircle2, Loader2, LogOut, MapPin, MessageCircle, Package, Phone, RefreshCw } from "lucide-react"
+import { AlertTriangle, Calendar, CalendarDays, CheckCircle2, Clock, Loader2, LogOut, MapPin, MessageCircle, Package, Phone, RefreshCw } from "lucide-react"
 
 interface MobileDelivererProfile {
   _id: string
@@ -91,6 +91,30 @@ const getWhatsappHref = (phoneNumber: string) => {
 
 const getStatusBadgeLabel = (status?: string) => {
   return status ? status.replace(/_/g, " ") : "Assignee"
+}
+
+const isTodayDelivery = (value?: string | number) => {
+  if (value === undefined || value === null) return false
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return false
+  const now = new Date()
+  return (
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear()
+  )
+}
+
+const getDeliveryTimeLabel = (value?: string | number) => {
+  const date = new Date(value as string | number)
+  if (Number.isNaN(date.getTime())) return null
+  return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(date)
+}
+
+const getDeliveryDateLabel = (value?: string | number) => {
+  const date = new Date(value as string | number)
+  if (Number.isNaN(date.getTime())) return null
+  return new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "2-digit", month: "short" }).format(date)
 }
 
 function MobileDelivererPage() {
@@ -218,7 +242,21 @@ function MobileDelivererPage() {
   const deliveredAssignedPreDeliveries = assignedPreDeliveries.filter((preDelivery) => preDelivery.status === "delivered")
 
   const renderAssignedPreDeliveries = (items: PreDelivery[], emptyMessage: string) => {
-    if (items.length === 0) {
+    const isDeliveredGroup = items.length > 0 && items.every((item) => item.status === "delivered")
+    const todayItems = isDeliveredGroup
+      ? []
+      : items
+          .filter((item) => item.preferred_delivery_date && isTodayDelivery(item.preferred_delivery_date))
+          .slice()
+          .sort((a, b) => {
+            const ta = new Date(a.preferred_delivery_date as string | number).getTime()
+            const tb = new Date(b.preferred_delivery_date as string | number).getTime()
+            return ta - tb
+          })
+    const todayIds = new Set(todayItems.map((item) => item.pre_delivery_id))
+    const otherItems = items.filter((item) => !todayIds.has(item.pre_delivery_id))
+
+    if (todayItems.length === 0 && otherItems.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
           <Package className="h-10 w-10 text-muted-foreground/35" aria-hidden />
@@ -228,8 +266,196 @@ function MobileDelivererPage() {
     }
 
     return (
-      <div className="space-y-3 px-3 pb-4 pt-2 sm:px-4 sm:pb-6">
-        {items.map((preDelivery) => {
+      <div className="space-y-4 px-3 pb-4 pt-2 sm:px-4 sm:pb-6">
+        {todayItems.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-[#1a1009] flex items-center gap-2">
+              <Clock className="h-4 w-4 text-[#22D3EE]" />
+              Aujourd&apos;hui
+            </h3>
+            {todayItems.map((preDelivery) => {
+              const now = Date.now()
+              const deliveryTime = preDelivery.preferred_delivery_date ? new Date(preDelivery.preferred_delivery_date).getTime() : null
+              const isOverdue = deliveryTime !== null && deliveryTime < now
+              const isSoon = deliveryTime !== null && !isOverdue && deliveryTime - now <= 60 * 60 * 1000
+              const timeLabel = deliveryTime ? getDeliveryTimeLabel(preDelivery.preferred_delivery_date) : null
+              const dateLabel = deliveryTime ? getDeliveryDateLabel(preDelivery.preferred_delivery_date) : null
+              const phoneHref = getPhoneHref(preDelivery.recipient_phone_number)
+              const whatsappHref = getWhatsappHref(preDelivery.recipient_phone_number)
+              const isDelivering = deliveringPreDeliveryId === preDelivery.pre_delivery_id
+
+              return (
+                <div
+                  key={preDelivery.pre_delivery_id}
+                  className={`rounded-xl border shadow-sm overflow-hidden transition-all ${
+                    isOverdue
+                      ? "border-red-400 bg-red-50 ring-2 ring-red-300"
+                      : isSoon
+                        ? "border-orange-300 bg-orange-50 ring-1 ring-orange-200"
+                        : "border-[#B08968]/15 bg-white"
+                  }`}
+                >
+                  <div
+                    className={`flex items-center justify-between gap-3 px-4 py-2 ${
+                      isOverdue ? "bg-red-500" : isSoon ? "bg-orange-400" : "bg-[#1a1009]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {isOverdue ? (
+                        <AlertTriangle className="h-4 w-4 text-white shrink-0" />
+                      ) : (
+                        <Clock className="h-4 w-4 text-white shrink-0" />
+                      )}
+                      {timeLabel ? (
+                        <span className="text-white font-bold text-sm tracking-wide">{timeLabel}</span>
+                      ) : (
+                        <span className="text-white/60 text-xs">Heure non renseignée</span>
+                      )}
+                      {dateLabel && <span className="text-white/70 text-xs capitalize">{dateLabel}</span>}
+                    </div>
+                    {isOverdue && (
+                      <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wide">En retard</span>
+                    )}
+                    {isSoon && (
+                      <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wide">Bientôt</span>
+                    )}
+                  </div>
+
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-[#1a1009] leading-tight">
+                          {preDelivery.recipient_name || "Non spécifié"}
+                        </p>
+                        <p className="text-xs text-[#B08968] mt-0.5">
+                          {formatDetailValue(preDelivery.package_description)}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-semibold tabular-nums text-[#1a1009]">
+                        {formatDetailValue(preDelivery.package_value_amount)} {formatDetailValue(preDelivery.package_value_currency)}
+                      </span>
+                    </div>
+
+                    <div
+                      className={`flex items-start gap-2 rounded-lg p-2 border ${
+                        isOverdue ? "bg-red-100/60 border-red-200" : "bg-[#22D3EE]/5 border-[#22D3EE]/20"
+                      }`}
+                    >
+                      <MapPin className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${isOverdue ? "text-red-500" : "text-[#22D3EE]"}`} />
+                      <p className="text-xs text-[#1a1009] leading-snug break-words">
+                        {formatDetailValue(preDelivery.recipient_address_line)}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {phoneHref && (
+                        <Button
+                          asChild
+                          size="sm"
+                          className={`h-8 flex-1 sm:flex-none text-xs font-semibold border-0 ${
+                            isOverdue
+                              ? "bg-red-600 hover:bg-red-700 text-white"
+                              : "bg-gradient-to-r from-[#22D3EE] to-[#06b6d4] text-white hover:from-[#06b6d4] hover:to-[#22D3EE]"
+                          }`}
+                        >
+                          <a href={phoneHref}>
+                            <Phone className="h-3 w-3 mr-1" />
+                            Appeler
+                          </a>
+                        </Button>
+                      )}
+                      {whatsappHref && (
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="outline"
+                          className="h-8 flex-1 sm:flex-none border-green-600 text-green-700 hover:bg-green-50 text-xs font-semibold"
+                        >
+                          <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+                            <MessageCircle className="h-3 w-3 mr-1" />
+                            WhatsApp
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-[#B08968]/20 bg-[#f8fafc] px-3 py-3">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Button
+                        type="button"
+                        className="h-9 w-full bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 text-xs font-semibold shadow-md transition-all duration-300 border-0"
+                        onClick={() => setDeliveryToConfirm(preDelivery)}
+                        disabled={isDelivering}
+                      >
+                        {isDelivering ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                        {isDelivering ? "Signalement..." : "Livrée"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 w-full text-orange-600 border-orange-300 hover:bg-orange-50 text-xs font-semibold transition-all duration-300"
+                        onClick={() => setFailingPreDeliveryId(preDelivery.pre_delivery_id)}
+                        disabled={isDelivering}
+                      >
+                        Échec
+                      </Button>
+                    </div>
+
+                    {failingPreDeliveryId === preDelivery.pre_delivery_id && (
+                      <div className="mt-3 space-y-3 rounded-lg border border-orange-200 bg-orange-50/90 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label htmlFor={`failure-note-${preDelivery.pre_delivery_id}`} className="text-[#1a1009] font-medium text-xs">Motif d&apos;échec</Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setFailingPreDeliveryId(null)}
+                            className="text-[#B08968] hover:text-[#1a1009] text-xs h-6 px-2"
+                          >
+                            Annuler
+                          </Button>
+                        </div>
+                        <Textarea
+                          id={`failure-note-${preDelivery.pre_delivery_id}`}
+                          value={failureNotes[preDelivery.pre_delivery_id] || ""}
+                          onChange={(event) =>
+                            setFailureNotes((prev) => ({
+                              ...prev,
+                              [preDelivery.pre_delivery_id]: event.target.value,
+                            }))
+                          }
+                          placeholder="Expliquez brièvement..."
+                          rows={3}
+                          className="border-[#B08968]/20 focus:border-orange-400 text-xs"
+                        />
+                        <Button
+                          type="button"
+                          className="h-9 w-full bg-gradient-to-r from-orange-600 to-orange-700 text-white hover:from-orange-700 hover:to-orange-800 text-xs font-semibold shadow-md transition-all duration-300 border-0"
+                          onClick={() => handleSignalDeliveryFailed(preDelivery)}
+                          disabled={isDelivering}
+                        >
+                          {isDelivering ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
+                          {isDelivering ? "Signalement..." : "Confirmer"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {otherItems.length > 0 && (
+          <div className="space-y-3">
+            {todayItems.length > 0 && (
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-[#1a1009] flex items-center gap-2">
+                <Package className="h-4 w-4 text-[#B08968]" />
+                Autres
+              </h3>
+            )}
+            {otherItems.map((preDelivery) => {
           const phoneHref = getPhoneHref(preDelivery.recipient_phone_number)
           const whatsappHref = getWhatsappHref(preDelivery.recipient_phone_number)
           const createdDate = formatDate(preDelivery.created_at || preDelivery.createdAt)
@@ -407,7 +633,9 @@ function MobileDelivererPage() {
               )}
             </div>
           )
-        })}
+            })}
+          </div>
+        )}
       </div>
     )
   }
