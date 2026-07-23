@@ -42,6 +42,7 @@ type PreDeliveryStatus =
   | "does_not_remember"
   | "beyond_delivery_zone"
   | "will_call_us_when_ready"
+  | "unreachable_phone_number"
 
 interface CloserCustomer {
   name: string
@@ -164,6 +165,14 @@ const STATUS_CONFIG: Record<
     ring: "ring-blue-300",
     rowBg: "bg-blue-50/30",
   },
+  unreachable_phone_number: {
+    label: "Numéro injoignable",
+    icon: Phone,
+    color: "text-rose-700",
+    bg: "bg-rose-50",
+    ring: "ring-rose-300",
+    rowBg: "bg-rose-50/30",
+  },
 }
 
 function getStatusKey(status?: string | null): PreDeliveryStatus | "pending" {
@@ -177,6 +186,7 @@ function getStatusKey(status?: string | null): PreDeliveryStatus | "pending" {
     notinterested: "not_interested",
     doesnotremember: "does_not_remember",
     confirmed: "confirmed",
+    unreachablephonenumber: "unreachable_phone_number",
   }
   return mapped[normalized.replace(/[\s_-]/g, "")] || "pending"
 }
@@ -1076,6 +1086,7 @@ export function ClosingsContent({ initialProfile }: { initialProfile?: CloserPro
                                       <SelectContent>
                                         <SelectItem value="confirmed">Confirmé</SelectItem>
                                         <SelectItem value="no_response">Pas de réponse</SelectItem>
+                                        <SelectItem value="unreachable_phone_number">Numéro injoignable</SelectItem>
                                         <SelectItem value="not_interested">Pas intéressé</SelectItem>
                                         <SelectItem value="does_not_remember">Ne se souvient pas</SelectItem>
                                         <SelectItem value="beyond_delivery_zone">Hors zone</SelectItem>
@@ -1206,12 +1217,22 @@ export function ClosingsContent({ initialProfile }: { initialProfile?: CloserPro
                               <SelectContent className="max-h-[min(70vh,24rem)]">
                                 <SelectItem value="confirmed">Confirmé</SelectItem>
                                 <SelectItem value="no_response">Pas de réponse</SelectItem>
+                                <SelectItem value="unreachable_phone_number">Numéro injoignable</SelectItem>
                                 <SelectItem value="not_interested">Pas intéressé</SelectItem>
                                 <SelectItem value="does_not_remember">Ne se souvient pas</SelectItem>
                                 <SelectItem value="beyond_delivery_zone">Hors zone</SelectItem>
                                 <SelectItem value="will_call_us_when_ready">Rappellera</SelectItem>
                               </SelectContent>
                             </Select>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleQuickStatusUpdate(pd, 'unreachable_phone_number')}
+                              disabled={isUpdating}
+                              className="w-full"
+                            >
+                              Numéro injoignable
+                            </Button>
                             <Button
                               variant="outline"
                               size="sm"
@@ -1260,6 +1281,15 @@ export function ClosingsContent({ initialProfile }: { initialProfile?: CloserPro
                                   className="w-full"
                                 >
                                   Pas de réponse
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleQuickStatusUpdate(pd, 'unreachable_phone_number')}
+                                  disabled={isUpdating}
+                                  className="w-full"
+                                >
+                                  Numéro injoignable
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -1665,6 +1695,7 @@ export function ClosingsContent({ initialProfile }: { initialProfile?: CloserPro
                     <SelectContent>
                       <SelectItem value="confirmed">Confirmé</SelectItem>
                       <SelectItem value="no_response">Pas de réponse</SelectItem>
+                      <SelectItem value="unreachable_phone_number">Numéro injoignable</SelectItem>
                       <SelectItem value="not_interested">Pas intéressé</SelectItem>
                       <SelectItem value="does_not_remember">Ne se souvient pas</SelectItem>
                       <SelectItem value="beyond_delivery_zone">Hors zone</SelectItem>

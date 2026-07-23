@@ -90,6 +90,7 @@ const getWhatsappHref = (phoneNumber: string) => {
 }
 
 const getStatusBadgeLabel = (status?: string) => {
+  if (status === "unreachable_phone_number") return "Numéro injoignable"
   return status ? status.replace(/_/g, " ") : "Assignee"
 }
 
@@ -447,19 +448,10 @@ function MobileDelivererPage() {
           </div>
         )}
 
-        {otherItems.length > 0 && (
-          <div className="space-y-3">
-            {todayItems.length > 0 && (
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-[#1a1009] flex items-center gap-2">
-                <Package className="h-4 w-4 text-[#B08968]" />
-                Autres
-              </h3>
-            )}
-            {otherItems.map((preDelivery) => {
+        {otherItems.map((preDelivery) => {
           const phoneHref = getPhoneHref(preDelivery.recipient_phone_number)
           const whatsappHref = getWhatsappHref(preDelivery.recipient_phone_number)
           const createdDate = formatDate(preDelivery.created_at || preDelivery.createdAt)
-          const customerName = getCustomerDisplayName(preDelivery.customer)
           const packageValue = `${formatDetailValue(preDelivery.package_value_amount)} ${formatDetailValue(preDelivery.package_value_currency)}`
           const isDelivered = preDelivery.status === "delivered"
           const isDelivering = deliveringPreDeliveryId === preDelivery.pre_delivery_id
@@ -633,9 +625,7 @@ function MobileDelivererPage() {
               )}
             </div>
           )
-            })}
-          </div>
-        )}
+        })}
       </div>
     )
   }
