@@ -177,6 +177,7 @@ function PreDeliveryContent() {
     const statusLabels: Record<string, string> = {
       confirmed: "Confirmé",
       no_response: "Pas de réponse",
+      unreachable_phone_number: "Numéro injoignable",
       not_interested: "Pas intéressé",
       does_not_remember: "Ne se souvient pas",
       beyond_delivery_zone: "Hors zone de livraison",
@@ -192,6 +193,7 @@ function PreDeliveryContent() {
     const statusColors: Record<string, string> = {
       confirmed: "bg-green-100 text-green-800",
       no_response: "bg-gray-100 text-gray-800",
+      unreachable_phone_number: "bg-rose-100 text-rose-800",
       not_interested: "bg-red-100 text-red-800",
       does_not_remember: "bg-orange-100 text-orange-800",
       beyond_delivery_zone: "bg-purple-100 text-purple-800",

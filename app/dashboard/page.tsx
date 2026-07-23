@@ -143,6 +143,11 @@ export default function Dashboard() {
         label: "Rappellera quand prêt",
         color: "bg-blue-100 text-blue-700 border-blue-200",
         icon: <PhoneCall className="h-3 w-3" />
+      },
+      unreachable_phone_number: {
+        label: "Numéro injoignable",
+        color: "bg-rose-100 text-rose-700 border-rose-200",
+        icon: <PhoneOff className="h-3 w-3" />
       }
     }
 
@@ -271,6 +276,7 @@ export default function Dashboard() {
                   <SelectItem value="failed_pickup">Échec collecte</SelectItem>
                   <SelectItem value="delivery_failed">Échec livraison</SelectItem>
                   <SelectItem value="no_response">Pas de réponse</SelectItem>
+                  <SelectItem value="unreachable_phone_number">Numéro injoignable</SelectItem>
                   <SelectItem value="not_interested">Pas intéressé</SelectItem>
                   <SelectItem value="does_not_remember">Ne se souvient pas</SelectItem>
                   <SelectItem value="beyond_delivery_zone">Hors zone</SelectItem>

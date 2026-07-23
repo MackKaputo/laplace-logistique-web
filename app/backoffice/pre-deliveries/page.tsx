@@ -36,6 +36,7 @@ import {
 
 type PreDeliveryStatus =
   | "no_response"
+  | "unreachable_phone_number"
   | "confirmed"
   | "not_interested"
   | "does_not_remember"
@@ -100,6 +101,14 @@ const STATUS_CONFIG: Record<
     ring: "ring-gray-300",
     rowBg: "",
   },
+  unreachable_phone_number: {
+    label: "Numéro injoignable",
+    icon: Phone,
+    color: "text-rose-700",
+    bg: "bg-rose-50",
+    ring: "ring-rose-300",
+    rowBg: "bg-rose-50/30",
+  },
   confirmed: {
     label: "Confirmé",
     icon: CheckCircle2,
@@ -156,6 +165,8 @@ function getStatusKey(status?: string | null): PreDeliveryStatus | "pending" {
     will_call_us_when_ready: "will_call_us_when_ready",
     noresponse: "no_response",
     no_response: "no_response",
+    unreachablephonenumber: "unreachable_phone_number",
+    unreachable_phone_number: "unreachable_phone_number",
     notinterested: "not_interested",
     not_interested: "not_interested",
     doesnotremember: "does_not_remember",
@@ -570,6 +581,7 @@ function PreDeliveriesContent() {
                   <SelectItem value="pending">En attente</SelectItem>
                   <SelectItem value="confirmed">Confirmé</SelectItem>
                   <SelectItem value="no_response">Pas de réponse</SelectItem>
+                  <SelectItem value="unreachable_phone_number">Numéro injoignable</SelectItem>
                   <SelectItem value="not_interested">Pas intéressé</SelectItem>
                   <SelectItem value="does_not_remember">Ne se souvient pas</SelectItem>
                   <SelectItem value="beyond_delivery_zone">Hors zone</SelectItem>
@@ -746,6 +758,7 @@ function PreDeliveriesContent() {
                                         <SelectContent>
                                           <SelectItem value="confirmed">✅ Confirmé</SelectItem>
                                           <SelectItem value="no_response">📞 Pas de réponse</SelectItem>
+                                          <SelectItem value="unreachable_phone_number">📞 Numéro injoignable</SelectItem>
                                           <SelectItem value="not_interested">❌ Pas intéressé</SelectItem>
                                           <SelectItem value="does_not_remember">❓ Ne se souvient pas</SelectItem>
                                           <SelectItem value="beyond_delivery_zone">📍 Hors zone</SelectItem>
@@ -865,6 +878,7 @@ function PreDeliveriesContent() {
                                 <SelectContent>
                                   <SelectItem value="confirmed">✅ Confirmé</SelectItem>
                                   <SelectItem value="no_response">📞 Pas de réponse</SelectItem>
+                                  <SelectItem value="unreachable_phone_number">📞 Numéro injoignable</SelectItem>
                                   <SelectItem value="not_interested">❌ Pas intéressé</SelectItem>
                                   <SelectItem value="does_not_remember">❓ Pas de souvenir</SelectItem>
                                   <SelectItem value="beyond_delivery_zone">📍 Hors zone</SelectItem>
@@ -991,6 +1005,7 @@ function PreDeliveriesContent() {
                     <SelectContent>
                       <SelectItem value="confirmed">✅ Confirmé</SelectItem>
                       <SelectItem value="no_response">📞 Pas de réponse</SelectItem>
+                      <SelectItem value="unreachable_phone_number">📞 Numéro injoignable</SelectItem>
                       <SelectItem value="not_interested">❌ Pas intéressé</SelectItem>
                       <SelectItem value="does_not_remember">❓ Ne se souvient pas</SelectItem>
                       <SelectItem value="beyond_delivery_zone">📍 Hors zone</SelectItem>
